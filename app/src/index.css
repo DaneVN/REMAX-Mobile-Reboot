@@ -51,8 +51,17 @@
   }
 }*/
 
+:root,
+#root,
+#docs-root {
+  --cl-accent-dark: #780000;
+  --cl-accent: #c1121f;
+  --cl-white: #fdf0d5;
+  --cl-base-dark: #003049;
+  --cl-base: #669bbc;
+}
+
 #root {
-  width: 1126px;
   max-width: 100%;
   margin: 0 auto;
   text-align: center;
