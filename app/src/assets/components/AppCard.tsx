@@ -1,3 +1,5 @@
+import { NavLink } from "react-router-dom";
+
 function AppCard() {
   return (
     <div
@@ -9,7 +11,7 @@ function AppCard() {
       <ul className="grid grid-cols-2 gap-2 mt-4 md:grid-cols-3 lg:grid-cols-4 place-self-center">
         {/* listed Icons that have btn functions attached */}
         <li className="bg-(--cl-accent) text-(--cl-white) p-2 rounded shadow-md w-40 max-w-2xl h-40 items-center justify-center flex">
-          App 1
+          <NavLink to="/calculator">Calculator</NavLink>
         </li>
         <li className="bg-(--cl-accent) text-(--cl-white) p-2 rounded shadow-md w-40 max-w-2xl h-40 items-center justify-center flex">
           App 2
