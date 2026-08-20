@@ -5,7 +5,7 @@ import Login from "./assets/pages/Login";
 // import Pipeline from "./assets/pages/Pipeline";
 // import Calculator from "./assets/pages/Calculator";
 // import Stats from "./assets/pages/Stats";
-// import AuthRequired from "./assets/components/AuthRequired";
+import AuthRequired from "./assets/components/AuthRequired";
 import Layout from "./assets/pages/Layout";
 // import AdminRequired from "./assets/components/AdminRequired";
 
@@ -24,17 +24,18 @@ function App({ classN }: { classN: string }) {
       {/* Define your routes here */}
       <Routes>
         <Route path="/login" element={<Login />} />
-        {/* <Route element={<AuthRequired />}> */}
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Home />} />{" "}
-          {/* <Route path="/workflow" element={<Workflow />} />
+        <Route element={<AuthRequired />}>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Home />} />
+            {/* <Route path="/workflow" element={<Workflow />} />
           <Route path="/pipeline" element={<Pipeline />} />
           <Route path="/calculator" element={<Calculator />} /> */}
+          </Route>
+          {/* </Route>
+          <Route element={<AdminRequired />}>
+          <Route path="/stats" element={<Stats />} /> */}
         </Route>
-        {/* </Route> */}
-        {/* <Route element={<AdminRequired />}> */}
-        {/* <Route path="/stats" element={<Stats />} /> */}
-        {/* </Route> */}
+        <Route path="*" element={<div>404 Not Found</div>} />
       </Routes>
     </div>
   );
