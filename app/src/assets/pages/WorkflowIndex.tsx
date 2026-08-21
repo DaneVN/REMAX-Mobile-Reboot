@@ -21,8 +21,11 @@ function WorkflowIndex() {
       .select("id, property_address, deal_type, status")
       .eq("status", "active")
       .order("created_at", { ascending: false })
-      .then(({ data }) => {
+      .then(({ data, error }) => {
         if (cancelled) return;
+        if (error) {
+          console.error("Failed to fetch deals:", error);
+        }
         setDeals(data ?? []);
         setLoading(false);
       });
@@ -37,7 +40,7 @@ function WorkflowIndex() {
 
   return (
     <div className="flex flex-col gap-3 p-4">
-      <h1>Your Active Deals</h1>
+      <h1>All Active Deals</h1>
       {deals.map((deal) => (
         <Link
           key={deal.id}
