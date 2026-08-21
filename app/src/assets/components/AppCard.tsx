@@ -12,7 +12,7 @@ function AppCard() {
         <li>
           <Link
             to="/workflow"
-            className="bg-(--cl-accent) text-(--cl-white) p-2 rounded shadow-md w-45 max-w-2xl h-40 items-center justify-center flex"
+            className="bg-(--cl-accent) text-(--cl-white) p-2 rounded shadow-md max-w-2xl items-center justify-center flex"
           >
             Workflow
           </Link>
@@ -20,7 +20,7 @@ function AppCard() {
         <li>
           <Link
             to="/pipeline"
-            className="bg-(--cl-accent) text-(--cl-white) p-2 rounded shadow-md w-45 max-w-2xl h-40 items-center justify-center flex"
+            className="bg-(--cl-accent) text-(--cl-white) p-2 rounded shadow-md max-w-2xl items-center justify-center flex"
           >
             Pipeline
           </Link>
@@ -28,7 +28,7 @@ function AppCard() {
         <li>
           <Link
             to="/calculator"
-            className="bg-(--cl-accent) text-(--cl-white) p-2 rounded shadow-md w-45 max-w-2xl h-40 items-center justify-center flex"
+            className="bg-(--cl-accent) text-(--cl-white) p-2 rounded shadow-md max-w-2xl items-center justify-center flex"
           >
             Calculator
           </Link>

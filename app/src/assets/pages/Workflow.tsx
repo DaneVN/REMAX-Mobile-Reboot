@@ -11,7 +11,12 @@ function Workflow() {
   const { dealId } = useParams<{ dealId: string }>();
   const [board, setBoard] = useState<WorkflowBoard | null>(null);
   const [deals, setDeals] = useState<
-    { id: string; property_address: string; deal_type: string; status: string }[]
+    {
+      id: string;
+      property_address: string;
+      deal_type: string;
+      status: string;
+    }[]
   >([]);
   const [loading, setLoading] = useState(true);
 
@@ -63,32 +68,34 @@ function Workflow() {
       <h1 className="text-2xl font-bold">{propertyAddress}</h1>
 
       {/* Column Headers */}
-      {(["todo", "doing", "done"] as const).map((col) => (
-        <div key={col} className="flex-1 bg-(--cl-base) rounded p-3">
-          <h2 className="capitalize mb-2">{col}</h2>
-          {/* Column Tasks */}
-          {columns[col].map((task) => (
-            <div
-              key={task.id}
-              className={
-                (task.due_date &&
-                new Date(task.due_date) < today &&
-                task.column !== "done"
-                  ? "bg-(--cl-accent)"
-                  : "bg-(--cl-white)") +
-                " text-(--cl-dark-blue) p-2 mb-2 rounded shadow hover:shadow-lg transition-shadow"
-              }
-            >
-              <p className="font-medium">{task.title}</p>
-              {task.due_date && (
-                <p className="text-sm text-(--cl-dark-blue)">
-                  Due: {task.due_date}
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
-      ))}
+      <div className="sm:flex gap-4">
+        {(["todo", "doing", "done"] as const).map((col) => (
+          <div key={col} className="flex-1 bg-(--cl-base) rounded p-3">
+            <h2 className="capitalize mb-2">{col}</h2>
+            {/* Column Tasks */}
+            {columns[col].map((task) => (
+              <div
+                key={task.id}
+                className={
+                  (task.due_date &&
+                  new Date(task.due_date) < today &&
+                  task.column !== "done"
+                    ? "bg-(--cl-accent)"
+                    : "bg-(--cl-white)") +
+                  " text-(--cl-dark-blue) p-2 mb-2 rounded shadow hover:shadow-lg transition-shadow"
+                }
+              >
+                <p className="font-medium">{task.title}</p>
+                {task.due_date && (
+                  <p className="text-sm text-(--cl-dark-blue)">
+                    Due: {task.due_date}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
