@@ -57,6 +57,23 @@ function Workflow() {
     };
   }, []);
 
+  /**
+   * Merge an updated task back into the board's local state.
+   * Replaces the matching task by id, in place, without a refetch.
+   */
+  function handleTaskSaved(updatedTask: WorkflowTask) {
+    setBoard((currentBoard) => {
+      if (!currentBoard) return currentBoard;
+
+      return {
+        ...currentBoard,
+        workflow_tasks: currentBoard.workflow_tasks.map((task) =>
+          task.id === updatedTask.id ? updatedTask : task,
+        ),
+      };
+    });
+  }
+
   /** Get the property address for the current deal */
   const currentDeal = deals?.find((deal) => deal.id === dealId);
   const propertyAddress = currentDeal?.property_address || "Unknown Address";
@@ -89,7 +106,9 @@ function Workflow() {
                   " text-(--cl-dark-blue) p-2 mb-2 rounded shadow hover:shadow-lg transition-shadow"
                 }
               >
-                <div onClick={() => setSelectedTask(task)}>{task.title}</div>
+                <div onClick={() => setSelectedTask(task)}>
+                  <strong>{task.title}</strong>
+                </div>
                 {task.description && (
                   <p className="text-sm text-(--cl-dark-blue)">
                     {task.description}
@@ -110,9 +129,8 @@ function Workflow() {
         <TaskEditModal
           task={selectedTask}
           onClose={() => setSelectedTask(null)}
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          onSaved={(updated) => {
-            // merge `updated` back into your board's local task list/state
+          onSaved={(updatedTask) => {
+            handleTaskSaved(updatedTask);
           }}
         />
       )}
