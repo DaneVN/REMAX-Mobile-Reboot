@@ -40,7 +40,13 @@ function WorkflowIndex() {
 
   return (
     <div className="flex flex-col gap-3 p-4">
-      <h1>All Active Deals</h1>
+      <h1>Your Active Deals</h1>
+      <Link
+        to="/deals/new"
+        className="self-start bg-(--cl-accent-dark) text-(--cl-white) px-4 py-2 rounded"
+      >
+        + New Deal
+      </Link>
       {deals.map((deal) => (
         <Link
           key={deal.id}
