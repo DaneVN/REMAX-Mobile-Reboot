@@ -8,15 +8,7 @@ function AppCard() {
     >
       <h2>App Card</h2>
       <p>Quick access to your tools.</p>
-      <ul className="grid grid-cols-2 gap-2 mt-4 md:grid-cols-3 lg:grid-cols-4 place-self-center">
-        <li>
-          <Link
-            to="/workflow"
-            className="bg-(--cl-accent) text-(--cl-white) p-2 rounded shadow-md max-w-2xl items-center justify-center flex"
-          >
-            Workflow
-          </Link>
-        </li>
+      <ul className="grid grid-cols-2 gap-2 mt-4 md:auto-cols-auto place-self-center">
         <li>
           <Link
             to="/pipeline"
