@@ -24,7 +24,7 @@ function NewDeal() {
 
   const [listingPrice, setListingPrice] = useState("");
   const [purchasePrice, setPurchasePrice] = useState("");
-  const [percentCommission, setPercentCommission] = useState("");
+  const [expectedCommission, setexpectedCommission] = useState("");
   const [commissionSplitPct, setCommissionSplitPct] = useState("");
   const [expectedCloseDate, setExpectedCloseDate] = useState("");
 
@@ -73,8 +73,8 @@ function NewDeal() {
         bondDetails: bondDetails || undefined,
         listingPrice: listingPrice ? parseFloat(listingPrice) : undefined,
         purchasePrice: purchasePrice ? parseFloat(purchasePrice) : undefined,
-        percentCommission: percentCommission
-          ? parseFloat(percentCommission)
+        expectedCommission: expectedCommission
+          ? parseFloat(expectedCommission)
           : undefined,
         commissionSplitPct: commissionSplitPct
           ? parseFloat(commissionSplitPct)
@@ -207,8 +207,8 @@ function NewDeal() {
               type="number"
               step="0.01"
               min="0"
-              value={percentCommission}
-              onChange={(e) => setPercentCommission(e.target.value)}
+              value={expectedCommission}
+              onChange={(e) => setexpectedCommission(e.target.value)}
             />
           </label>
           <label>
