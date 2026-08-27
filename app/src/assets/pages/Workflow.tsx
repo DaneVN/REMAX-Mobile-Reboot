@@ -85,7 +85,12 @@ function Workflow() {
                   " text-(--cl-dark-blue) p-2 mb-2 rounded shadow hover:shadow-lg transition-shadow"
                 }
               >
-                <p className="font-medium">{task.title}</p>
+                <h3 className="font-medium">{task.title}</h3>
+                {task.description && (
+                  <p className="text-sm text-(--cl-dark-blue)">
+                    {task.description}
+                  </p>
+                )}
                 {task.due_date && (
                   <p className="text-sm text-(--cl-dark-blue)">
                     Due: {task.due_date}
