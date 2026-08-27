@@ -19,7 +19,7 @@ type NewDealInput = {
   bondDetails?: string;
   listingPrice?: number;
   purchasePrice?: number;
-  percentCommission?: number;
+  expectedCommission?: number;
   commissionSplitPct?: number;
   expectedCloseDate?: string; // ISO date
 };
@@ -65,7 +65,7 @@ export async function createDealWithBoard(input: NewDealInput) {
     p_bond_details: input.bondDetails ?? null,
     p_listing_price: input.listingPrice ?? null,
     p_purchase_price: input.purchasePrice ?? null,
-    p_percent_commission: input.percentCommission ?? null,
+    p_expected_commission: input.expectedCommission ?? null,
     p_commission_split_pct: input.commissionSplitPct ?? null,
     p_expected_close_date: input.expectedCloseDate ?? null,
   });
