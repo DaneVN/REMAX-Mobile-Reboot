@@ -4,8 +4,10 @@ import {
   getWorkflowBoardByDeal,
   groupTasksByColumn,
   type WorkflowBoard,
+  type WorkflowTask,
 } from "../../lib/workflow";
 import { supabase } from "../../lib/supabaseClient";
+import TaskEditModal from "../components/TaskEditModal";
 
 function Workflow() {
   const { dealId } = useParams<{ dealId: string }>();
@@ -19,6 +21,8 @@ function Workflow() {
     }[]
   >([]);
   const [loading, setLoading] = useState(true);
+
+  const [selectedTask, setSelectedTask] = useState<WorkflowTask | null>(null);
 
   const today = new Date();
 
@@ -85,7 +89,7 @@ function Workflow() {
                   " text-(--cl-dark-blue) p-2 mb-2 rounded shadow hover:shadow-lg transition-shadow"
                 }
               >
-                <h3 className="font-medium">{task.title}</h3>
+                <div onClick={() => setSelectedTask(task)}>{task.title}</div>
                 {task.description && (
                   <p className="text-sm text-(--cl-dark-blue)">
                     {task.description}
@@ -101,6 +105,17 @@ function Workflow() {
           </div>
         ))}
       </div>
+
+      {selectedTask && (
+        <TaskEditModal
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          onSaved={(updated) => {
+            // merge `updated` back into your board's local task list/state
+          }}
+        />
+      )}
     </div>
   );
 }
