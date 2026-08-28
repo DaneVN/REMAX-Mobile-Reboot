@@ -23,8 +23,15 @@ function Workflow() {
   const [loading, setLoading] = useState(true);
 
   const [selectedTask, setSelectedTask] = useState<WorkflowTask | null>(null);
+  const [expandedColumns, setExpandedColumns] = useState<
+    Record<WorkflowTask["column"], boolean>
+  >({ todo: false, doing: false, done: false });
 
   const today = new Date();
+
+  function showMoreTasks(column: WorkflowTask["column"]) {
+    setExpandedColumns((current) => ({ ...current, [column]: true }));
+  }
 
   /** Fetch workflow board for the given dealId */
   useEffect(() => {
@@ -94,7 +101,7 @@ function Workflow() {
           <div key={col} className="flex-1 bg-(--cl-base) rounded p-3">
             <h2 className="capitalize mb-2">{col}</h2>
             {/* Column Tasks */}
-            {columns[col].map((task) => (
+            {columns[col].map((task, taskIndex) => (
               <div
                 key={task.id}
                 className={
@@ -103,10 +110,14 @@ function Workflow() {
                   task.column !== "done"
                     ? "bg-(--cl-accent)"
                     : "bg-(--cl-white)") +
-                  " text-(--cl-dark-blue) p-2 mb-2 rounded shadow hover:shadow-lg transition-shadow"
+                  " text-(--cl-dark-blue) p-2 mb-2 rounded shadow hover:shadow-lg transition-shadow flex flex-col gap-1 cursor-pointer" +
+                  (taskIndex >= 3 && !expandedColumns[col]
+                    ? " hidden md:flex"
+                    : "")
                 }
+                onClick={() => setSelectedTask(task)}
               >
-                <div onClick={() => setSelectedTask(task)}>
+                <div>
                   <strong>{task.title}</strong>
                 </div>
                 {task.description && (
@@ -121,6 +132,15 @@ function Workflow() {
                 )}
               </div>
             ))}
+            {columns[col].length > 3 && !expandedColumns[col] && (
+              <button
+                type="button"
+                className="md:hidden w-full rounded bg-(--cl-white) p-2 text-(--cl-dark-blue) shadow hover:shadow-lg transition-shadow"
+                onClick={() => showMoreTasks(col)}
+              >
+                Show more
+              </button>
+            )}
           </div>
         ))}
       </div>
