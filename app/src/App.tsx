@@ -3,6 +3,7 @@ import Home from "./assets/pages/Home";
 import Login from "./assets/pages/Login";
 import Workflow from "./assets/pages/Workflow";
 import NewDeal from "./assets/pages/NewDeal";
+import EditDeal from "./assets/pages/EditDeal";
 // import Pipeline from "./assets/pages/Pipeline";
 import Calculator from "./assets/pages/Calculator";
 // import Stats from "./assets/pages/Stats";
@@ -35,6 +36,7 @@ function App({ classN }: { classN: string }) {
             <Route path="/workflow" element={<WorkflowIndex />} />
             <Route path="/workflow/:dealId" element={<Workflow />} />
             <Route path="/deals/new" element={<NewDeal />} />
+            <Route path="/deals/:dealId/edit" element={<EditDeal />} />
             {/*<Route path="/pipeline" element={<Pipeline />} />*/}
             <Route path="/calculator" element={<Calculator />} />
           </Route>
