@@ -78,12 +78,17 @@ function WorkflowIndex() {
   return (
     <div className="flex flex-col gap-3 p-4">
       <h1>Your Active Deals</h1>
-      <Link
-        to="/deals/new"
-        className="self-start bg-(--cl-accent-dark) text-(--cl-white) px-4 py-2 rounded"
-      >
-        + New Deal
-      </Link>
+      <div className="flex gap-3">
+        <Link
+          to="/deals/new"
+          className="bg-(--cl-accent-dark) text-(--cl-white) px-4 py-2 rounded"
+        >
+          + New Deal
+        </Link>
+        <Link to="/deals/archived" className="border px-4 py-2 rounded">
+          View Archived
+        </Link>
+      </div>
 
       {actionError && <p className="text-red-700">{actionError}</p>}
       {deals.length === 0 && <p>No active deals yet.</p>}
@@ -111,7 +116,7 @@ function WorkflowIndex() {
               onClick={() => handleArchive(deal.id)}
               className="px-3 py-1 rounded border"
             >
-              Remove
+              <img src="Trash.svg" alt="Archive" className="w-4 h-4" />
             </button>
             {isAdmin && (
               <button
