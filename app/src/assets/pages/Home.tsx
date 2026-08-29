@@ -1,6 +1,6 @@
 import AppCard from "../components/AppCard";
-import Card from "../components/Card";
 import WorkflowOverviewCard from "../components/WorkflowOverviewCard";
+import DealProgressCard from "../components/DealProgressCard";
 
 function Home() {
   return (
@@ -11,7 +11,7 @@ function Home() {
         <br className="lg:hidden" />
         <AppCard />
         <br className="lg:hidden" />
-        <Card />
+        <DealProgressCard />
       </main>
     </>
   );
