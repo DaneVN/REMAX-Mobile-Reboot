@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../lib/AuthProvider";
 import { createDealWithBoard } from "../../lib/deals";
+import { isValidEmail, isValidPhone } from "../../lib/validators";
 
 type Representing = "seller" | "buyer" | "rental";
 type DealType = "sale" | "rental";
@@ -19,12 +20,13 @@ function NewDeal() {
   const [clientPhone, setClientPhone] = useState("");
 
   const [attorneyName, setAttorneyName] = useState("");
-  const [attorneyContact, setAttorneyContact] = useState("");
+  const [attorneyEmail, setAttorneyEmail] = useState("");
+  const [attorneyPhone, setAttorneyPhone] = useState("");
   const [bondDetails, setBondDetails] = useState("");
 
   const [listingPrice, setListingPrice] = useState("");
   const [purchasePrice, setPurchasePrice] = useState("");
-  const [expectedCommission, setexpectedCommission] = useState("");
+  const [expectedCommission, setExpectedCommission] = useState("");
   const [commissionSplitPct, setCommissionSplitPct] = useState("");
   const [expectedCloseDate, setExpectedCloseDate] = useState("");
 
@@ -35,13 +37,43 @@ function NewDeal() {
     e.preventDefault();
     if (!session) return;
 
+    // Trim text fields up front so whitespace-only entries don't sneak past
+    // "required" checks, and so nothing gets stored with stray padding.
+    const trimmedAddress = propertyAddress.trim();
+    const trimmedClientName = clientName.trim();
+
+    if (!trimmedAddress) {
+      setError("Property address is required.");
+      return;
+    }
+    if (!trimmedClientName) {
+      setError("Client name is required.");
+      return;
+    }
+
+    // Each of these fields is optional -- only validate format if the agent
+    // actually entered something. An empty optional field is never an error.
+    if (clientPhone && !isValidPhone(clientPhone)) {
+      setError("Please enter a valid 10-digit client phone number.");
+      return;
+    }
+    if (clientEmail && !isValidEmail(clientEmail)) {
+      setError("Please enter a valid client email address.");
+      return;
+    }
+    if (attorneyPhone && !isValidPhone(attorneyPhone)) {
+      setError("Please enter a valid 10-digit attorney phone number.");
+      return;
+    }
+    if (attorneyEmail && !isValidEmail(attorneyEmail)) {
+      setError("Please enter a valid attorney email address.");
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
     try {
-      // "representing" tells us whether the client we're capturing is the
-      // seller, the buyer, or a tenant (rental) — mapped to the correct
-      // side of the deal and the correct client "type" for the clients table.
       const clientTypeMap: Record<Representing, "seller" | "buyer" | "tenant"> =
         {
           seller: "seller",
@@ -49,9 +81,9 @@ function NewDeal() {
           rental: "tenant",
         };
 
-      const clientInput = clientName
+      const clientInput = trimmedClientName
         ? {
-            name: clientName,
+            name: trimmedClientName,
             email: clientEmail || undefined,
             phone: clientPhone || undefined,
             type: clientTypeMap[representing],
@@ -60,7 +92,7 @@ function NewDeal() {
 
       const { dealId } = await createDealWithBoard({
         agentId: session.user.id,
-        propertyAddress,
+        propertyAddress: trimmedAddress,
         dealType,
         representing,
         sellerClient: representing === "seller" ? clientInput : undefined,
@@ -68,9 +100,13 @@ function NewDeal() {
           representing === "buyer" || representing === "rental"
             ? clientInput
             : undefined,
-        attorneyName: attorneyName || undefined,
-        attorneyContact: attorneyContact || undefined,
-        bondDetails: bondDetails || undefined,
+        attorneyName: attorneyName.trim() || undefined,
+        // Combine into one string for storage, since `deals.attorney_contact`
+        // is a single text column -- but each was validated independently above.
+        attorneyContact:
+          [attorneyEmail, attorneyPhone].filter(Boolean).join(" / ") ||
+          undefined,
+        bondDetails: bondDetails.trim() || undefined,
         listingPrice: listingPrice ? parseFloat(listingPrice) : undefined,
         purchasePrice: purchasePrice ? parseFloat(purchasePrice) : undefined,
         expectedCommission: expectedCommission
@@ -124,7 +160,9 @@ function NewDeal() {
               value={representing}
               onChange={(e) => setRepresenting(e.target.value as Representing)}
             >
-              <option value="seller">Seller (listing agent)</option>
+              <option value="seller">
+                {dealType === "sale" ? "Seller (listing agent)" : "Landlord"}
+              </option>
               <option value="buyer">Buyer</option>
               <option value="rental">Tenant (rental)</option>
             </select>
@@ -162,6 +200,7 @@ function NewDeal() {
             placeholder="Client name"
             value={clientName}
             onChange={(e) => setClientName(e.target.value)}
+            required
           />
           <input
             type="email"
@@ -186,10 +225,16 @@ function NewDeal() {
             onChange={(e) => setAttorneyName(e.target.value)}
           />
           <input
-            type="text"
-            placeholder="Attorney contact"
-            value={attorneyContact}
-            onChange={(e) => setAttorneyContact(e.target.value)}
+            type="email"
+            placeholder="Attorney email"
+            value={attorneyEmail}
+            onChange={(e) => setAttorneyEmail(e.target.value)}
+          />
+          <input
+            type="tel"
+            placeholder="Attorney phone"
+            value={attorneyPhone}
+            onChange={(e) => setAttorneyPhone(e.target.value)}
           />
           <input
             type="text"
@@ -208,7 +253,7 @@ function NewDeal() {
               step="0.01"
               min="0"
               value={expectedCommission}
-              onChange={(e) => setexpectedCommission(e.target.value)}
+              onChange={(e) => setExpectedCommission(e.target.value)}
             />
           </label>
           <label>
