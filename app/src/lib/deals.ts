@@ -16,8 +16,8 @@ type NewDealInput = {
   propertyAddress: string;
   dealType: "sale" | "rental";
   representing: "seller" | "buyer" | "rental"; // decides which task template / board is used
-  sellerClient?: NewClientInput;
-  buyerClient?: NewClientInput;
+  sellerClients?: NewClientInput[];
+  buyerClients?: NewClientInput[]; // also used for tenants on rental deals
   attorneyName?: string;
   attorneyContact?: string;
   bondDetails?: string;
@@ -42,8 +42,17 @@ export type UpdateDealInput = Partial<{
   expectedCloseDate: string;
 }>;
 
+export type DealClient = {
+  id: string; // deal_clients row id
+  clientId: string;
+  role: "seller" | "buyer";
+  name: string;
+  email: string | null;
+  phone: string | null;
+};
+
 // ---------------------------------------------------------------------------
-// Internal helper
+// Internal helpers
 // ---------------------------------------------------------------------------
 
 async function insertClient(client: NewClientInput) {
@@ -62,25 +71,30 @@ async function insertClient(client: NewClientInput) {
   return data.id as string;
 }
 
+async function insertClients(clients: NewClientInput[] | undefined) {
+  if (!clients || clients.length === 0) return [];
+  const ids: string[] = [];
+  for (const client of clients) {
+    ids.push(await insertClient(client));
+  }
+  return ids;
+}
+
 // ---------------------------------------------------------------------------
-// Create -- deal + board + tasks, atomically, via the create_deal_with_board RPC
+// Create -- deal + board + tasks + client links, atomically, via RPC
 // ---------------------------------------------------------------------------
 
 export async function createDealWithBoard(input: NewDealInput) {
-  const sellerClientId = input.sellerClient
-    ? await insertClient(input.sellerClient)
-    : null;
-  const buyerClientId = input.buyerClient
-    ? await insertClient(input.buyerClient)
-    : null;
+  const sellerClientIds = await insertClients(input.sellerClients);
+  const buyerClientIds = await insertClients(input.buyerClients);
 
   const { data, error } = await supabase.rpc("create_deal_with_board", {
     p_agent_id: input.agentId,
     p_property_address: input.propertyAddress,
     p_deal_type: input.dealType,
     p_representing: input.representing,
-    p_seller_client_id: sellerClientId,
-    p_buyer_client_id: buyerClientId,
+    p_seller_client_ids: sellerClientIds,
+    p_buyer_client_ids: buyerClientIds,
     p_attorney_name: input.attorneyName ?? null,
     p_attorney_contact: input.attorneyContact ?? null,
     p_bond_details: input.bondDetails ?? null,
@@ -103,9 +117,64 @@ export async function createDealWithBoard(input: NewDealInput) {
 }
 
 // ---------------------------------------------------------------------------
-// Update -- used by the Edit Deal form.
-// RLS ("agents update their own deals" / "admins update all deals") governs
-// who this actually succeeds for -- no role check needed client-side.
+// Read -- clients linked to a deal, split by role. Used by Edit Deal / Pipeline.
+// ---------------------------------------------------------------------------
+
+export async function getDealClients(dealId: string): Promise<DealClient[]> {
+  const { data, error } = await supabase
+    .from("deal_clients")
+    .select(
+      `
+      id,
+      role,
+      client_id,
+      clients ( name, email, phone )
+    `,
+    )
+    .eq("deal_id", dealId);
+
+  if (error) throw error;
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    clientId: row.client_id,
+    role: row.role,
+    name: row.clients?.name ?? "",
+    email: row.clients?.email ?? null,
+    phone: row.clients?.phone ?? null,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Add / remove individual clients on an existing deal
+// ---------------------------------------------------------------------------
+
+export async function addClientToDeal(
+  dealId: string,
+  role: "seller" | "buyer",
+  client: NewClientInput,
+) {
+  const clientId = await insertClient(client);
+
+  const { error } = await supabase
+    .from("deal_clients")
+    .insert({ deal_id: dealId, client_id: clientId, role });
+
+  if (error) throw error;
+  return clientId;
+}
+
+export async function removeClientFromDeal(dealClientRowId: string) {
+  const { error } = await supabase
+    .from("deal_clients")
+    .delete()
+    .eq("id", dealClientRowId);
+
+  if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// Update -- deal-level fields only (unrelated to client links)
 // ---------------------------------------------------------------------------
 
 export async function updateDeal(dealId: string, input: UpdateDealInput) {
@@ -130,9 +199,7 @@ export async function updateDeal(dealId: string, input: UpdateDealInput) {
 }
 
 // ---------------------------------------------------------------------------
-// Archive (soft delete) -- available to the owning agent. Just flips a flag; the row
-// (and its board/tasks/history) stays intact, it's just filtered out of
-// normal views (see WorkflowIndex's query, which excludes is_deleted).
+// Archive (soft delete) -- available to the owning agent.
 // ---------------------------------------------------------------------------
 
 export async function archiveDeal(dealId: string) {
@@ -154,9 +221,7 @@ export async function restoreDeal(dealId: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Hard delete -- admin only. RLS enforces this server-side (the "admins
-// delete deals" policy); a non-admin calling this gets an RLS error back,
-// not a silent no-op, so always surface `error` to the user.
+// Hard delete -- admin only. RLS enforces this server-side.
 // ---------------------------------------------------------------------------
 
 export async function deleteDealPermanently(dealId: string) {
