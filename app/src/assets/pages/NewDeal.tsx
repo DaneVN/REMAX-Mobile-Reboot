@@ -7,6 +7,14 @@ import { isValidEmail, isValidPhone } from "../../lib/validators";
 type Representing = "seller" | "buyer" | "rental";
 type DealType = "sale" | "rental";
 
+type ClientRow = {
+  name: string;
+  email: string;
+  phone: string;
+};
+
+const EMPTY_CLIENT: ClientRow = { name: "", email: "", phone: "" };
+
 function NewDeal() {
   const { session } = useAuth();
   const navigate = useNavigate();
@@ -15,9 +23,11 @@ function NewDeal() {
   const [dealType, setDealType] = useState<DealType>("sale");
   const [representing, setRepresenting] = useState<Representing>("seller");
 
-  const [clientName, setClientName] = useState("");
-  const [clientEmail, setClientEmail] = useState("");
-  const [clientPhone, setClientPhone] = useState("");
+  // One dynamic list of clients for whichever side is being represented --
+  // a deal only ever collects clients for ONE side through this form (the
+  // other side, e.g. the buyer on a listing you don't also represent, gets
+  // added later once they're known, via the Edit Deal page).
+  const [clients, setClients] = useState<ClientRow[]>([{ ...EMPTY_CLIENT }]);
 
   const [attorneyName, setAttorneyName] = useState("");
   const [attorneyEmail, setAttorneyEmail] = useState("");
@@ -33,34 +43,62 @@ function NewDeal() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const clientLabel =
+    representing === "seller"
+      ? "Seller"
+      : representing === "buyer"
+        ? "Buyer"
+        : "Tenant";
+
+  function updateClient(index: number, field: keyof ClientRow, value: string) {
+    setClients((prev) =>
+      prev.map((c, i) => (i === index ? { ...c, [field]: value } : c)),
+    );
+  }
+
+  function addClientRow() {
+    setClients((prev) => [...prev, { ...EMPTY_CLIENT }]);
+  }
+
+  function removeClientRow(index: number) {
+    setClients((prev) => prev.filter((_, i) => i !== index));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!session) return;
 
-    // Trim text fields up front so whitespace-only entries don't sneak past
-    // "required" checks, and so nothing gets stored with stray padding.
     const trimmedAddress = propertyAddress.trim();
-    const trimmedClientName = clientName.trim();
-
     if (!trimmedAddress) {
       setError("Property address is required.");
       return;
     }
-    if (!trimmedClientName) {
-      setError("Client name is required.");
+
+    // Every client row needs at least a name; email/phone stay optional but
+    // must be valid format if the agent entered something.
+    const trimmedClients = clients.map((c) => ({
+      name: c.name.trim(),
+      email: c.email.trim(),
+      phone: c.phone.trim(),
+    }));
+
+    if (trimmedClients.some((c) => !c.name)) {
+      setError(
+        `Every ${clientLabel.toLowerCase()} needs a name (or remove the empty row).`,
+      );
       return;
+    }
+    for (const c of trimmedClients) {
+      if (c.phone && !isValidPhone(c.phone)) {
+        setError(`Please enter a valid 10-digit phone number for ${c.name}.`);
+        return;
+      }
+      if (c.email && !isValidEmail(c.email)) {
+        setError(`Please enter a valid email address for ${c.name}.`);
+        return;
+      }
     }
 
-    // Each of these fields is optional -- only validate format if the agent
-    // actually entered something. An empty optional field is never an error.
-    if (clientPhone && !isValidPhone(clientPhone)) {
-      setError("Please enter a valid 10-digit client phone number.");
-      return;
-    }
-    if (clientEmail && !isValidEmail(clientEmail)) {
-      setError("Please enter a valid client email address.");
-      return;
-    }
     if (attorneyPhone && !isValidPhone(attorneyPhone)) {
       setError("Please enter a valid 10-digit attorney phone number.");
       return;
@@ -74,35 +112,28 @@ function NewDeal() {
     setError(null);
 
     try {
-      const clientTypeMap: Record<Representing, "seller" | "buyer" | "tenant"> =
-        {
-          seller: "seller",
-          buyer: "buyer",
-          rental: "tenant",
-        };
-
-      const clientInput = trimmedClientName
-        ? {
-            name: trimmedClientName,
-            email: clientEmail || undefined,
-            phone: clientPhone || undefined,
-            type: clientTypeMap[representing],
-          }
-        : undefined;
+      const clientInputs = trimmedClients.map((c) => ({
+        name: c.name,
+        email: c.email || undefined,
+        phone: c.phone || undefined,
+        type: (representing === "seller"
+          ? "seller"
+          : representing === "buyer"
+            ? "buyer"
+            : "tenant") as "seller" | "buyer" | "tenant",
+      }));
 
       const { dealId } = await createDealWithBoard({
         agentId: session.user.id,
         propertyAddress: trimmedAddress,
         dealType,
         representing,
-        sellerClient: representing === "seller" ? clientInput : undefined,
-        buyerClient:
+        sellerClients: representing === "seller" ? clientInputs : undefined,
+        buyerClients:
           representing === "buyer" || representing === "rental"
-            ? clientInput
+            ? clientInputs
             : undefined,
         attorneyName: attorneyName.trim() || undefined,
-        // Combine into one string for storage, since `deals.attorney_contact`
-        // is a single text column -- but each was validated independently above.
         attorneyContact:
           [attorneyEmail, attorneyPhone].filter(Boolean).join(" / ") ||
           undefined,
@@ -193,27 +224,55 @@ function NewDeal() {
           )}
         </fieldset>
 
-        <fieldset className="flex flex-col gap-2">
-          <legend className="font-medium">Client</legend>
-          <input
-            type="text"
-            placeholder="Client name"
-            value={clientName}
-            onChange={(e) => setClientName(e.target.value)}
-            required
-          />
-          <input
-            type="email"
-            placeholder="Client email"
-            value={clientEmail}
-            onChange={(e) => setClientEmail(e.target.value)}
-          />
-          <input
-            type="tel"
-            placeholder="Client phone"
-            value={clientPhone}
-            onChange={(e) => setClientPhone(e.target.value)}
-          />
+        <fieldset className="flex flex-col gap-3">
+          <legend className="font-medium">{clientLabel}(s)</legend>
+
+          {clients.map((client, index) => (
+            <div key={index} className="flex flex-col gap-2 border rounded p-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">
+                  {clientLabel} {clients.length > 1 ? index + 1 : ""}
+                </span>
+                {clients.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeClientRow(index)}
+                    className="text-sm underline"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+
+              <input
+                type="text"
+                placeholder={`${clientLabel} name`}
+                value={client.name}
+                onChange={(e) => updateClient(index, "name", e.target.value)}
+                required
+              />
+              <input
+                type="email"
+                placeholder={`${clientLabel} email`}
+                value={client.email}
+                onChange={(e) => updateClient(index, "email", e.target.value)}
+              />
+              <input
+                type="tel"
+                placeholder={`${clientLabel} phone`}
+                value={client.phone}
+                onChange={(e) => updateClient(index, "phone", e.target.value)}
+              />
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={addClientRow}
+            className="self-start text-sm underline"
+          >
+            + Add another {clientLabel.toLowerCase()}
+          </button>
         </fieldset>
 
         <fieldset className="flex flex-col gap-2">

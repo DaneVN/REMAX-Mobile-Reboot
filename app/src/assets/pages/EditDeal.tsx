@@ -1,10 +1,18 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
-import { updateDeal } from "../../lib/deals";
+import {
+  updateDeal,
+  getDealClients,
+  addClientToDeal,
+  removeClientFromDeal,
+  type DealClient,
+} from "../../lib/deals";
+import { isValidEmail, isValidPhone } from "../../lib/validators";
 
 type DealType = "sale" | "rental";
 type DealStatus = "active" | "closed" | "fell_through";
+type ClientRole = "seller" | "buyer";
 
 type DealRow = {
   id: string;
@@ -42,6 +50,18 @@ function EditDeal() {
   const [commissionSplitPct, setCommissionSplitPct] = useState("");
   const [expectedCloseDate, setExpectedCloseDate] = useState("");
 
+  // -- Client management state --
+  const [dealClients, setDealClients] = useState<DealClient[]>([]);
+  const [clientsLoading, setClientsLoading] = useState(true);
+  const [clientError, setClientError] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  const [newClientRole, setNewClientRole] = useState<ClientRole>("seller");
+  const [newClientName, setNewClientName] = useState("");
+  const [newClientEmail, setNewClientEmail] = useState("");
+  const [newClientPhone, setNewClientPhone] = useState("");
+  const [addingClient, setAddingClient] = useState(false);
+
   useEffect(() => {
     if (!dealId) return;
     let cancelled = false;
@@ -57,8 +77,6 @@ function EditDeal() {
         if (cancelled) return;
 
         if (error || !data) {
-          // Either genuinely doesn't exist, or RLS silently excluded a deal
-          // that isn't this agent's -- both look identical here by design.
           setNotFound(true);
           setLoading(false);
           return;
@@ -77,6 +95,28 @@ function EditDeal() {
         setCommissionSplitPct(deal.commission_split_pct?.toString() ?? "");
         setExpectedCloseDate(deal.expected_close_date ?? "");
         setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dealId]);
+
+  useEffect(() => {
+    if (!dealId) return;
+    let cancelled = false;
+
+    getDealClients(dealId)
+      .then((data) => {
+        if (cancelled) return;
+        setDealClients(data);
+        setClientsLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("Failed to load deal clients:", err);
+        setClientError("Couldn't load clients for this deal.");
+        setClientsLoading(false);
       });
 
     return () => {
@@ -121,6 +161,77 @@ function EditDeal() {
     }
   }
 
+  async function handleAddClient(e: React.FormEvent) {
+    e.preventDefault();
+    if (!dealId) return;
+
+    const trimmedName = newClientName.trim();
+    const trimmedEmail = newClientEmail.trim();
+    const trimmedPhone = newClientPhone.trim();
+
+    if (!trimmedName) {
+      setClientError("Client name is required.");
+      return;
+    }
+    if (trimmedPhone && !isValidPhone(trimmedPhone)) {
+      setClientError("Please enter a valid 10-digit phone number.");
+      return;
+    }
+    if (trimmedEmail && !isValidEmail(trimmedEmail)) {
+      setClientError("Please enter a valid email address.");
+      return;
+    }
+
+    setClientError(null);
+    setAddingClient(true);
+
+    try {
+      // Tenants are stored under the "buyer" role on rental deals, per the
+      // existing convention -- mirrors the mapping used in NewDeal.tsx.
+      const clientType =
+        newClientRole === "seller"
+          ? "seller"
+          : dealType === "rental"
+            ? "tenant"
+            : "buyer";
+
+      await addClientToDeal(dealId, newClientRole, {
+        name: trimmedName,
+        email: trimmedEmail || undefined,
+        phone: trimmedPhone || undefined,
+        type: clientType,
+      });
+
+      const refreshed = await getDealClients(dealId);
+      setDealClients(refreshed);
+
+      setNewClientName("");
+      setNewClientEmail("");
+      setNewClientPhone("");
+    } catch (err) {
+      setClientError(
+        err instanceof Error ? err.message : "Failed to add client.",
+      );
+    } finally {
+      setAddingClient(false);
+    }
+  }
+
+  async function handleRemoveClient(dealClientRowId: string) {
+    setClientError(null);
+    setRemovingId(dealClientRowId);
+    try {
+      await removeClientFromDeal(dealClientRowId);
+      setDealClients((prev) => prev.filter((c) => c.id !== dealClientRowId));
+    } catch (err) {
+      setClientError(
+        err instanceof Error ? err.message : "Failed to remove client.",
+      );
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
   if (loading) return <p className="p-4">Loading deal…</p>;
 
   if (notFound) {
@@ -130,6 +241,9 @@ function EditDeal() {
       </div>
     );
   }
+
+  const sellers = dealClients.filter((c) => c.role === "seller");
+  const buyers = dealClients.filter((c) => c.role === "buyer");
 
   return (
     <div className="p-4 max-w-2xl mx-auto">
@@ -254,6 +368,120 @@ function EditDeal() {
           {submitting ? "Saving…" : "Save Changes"}
         </button>
       </form>
+
+      <hr className="my-6" />
+
+      <section className="flex flex-col gap-4">
+        <h2>Clients on this deal</h2>
+
+        {clientError && <p className="text-red-600">{clientError}</p>}
+        {clientsLoading && <p>Loading clients…</p>}
+
+        {!clientsLoading && (
+          <>
+            <div>
+              <h3 className="font-medium">Sellers</h3>
+              {sellers.length === 0 && (
+                <p className="text-sm">None linked yet.</p>
+              )}
+              {sellers.map((c) => (
+                <div
+                  key={c.id}
+                  className="flex justify-between items-center border rounded p-2 mt-1"
+                >
+                  <div>
+                    <p>{c.name}</p>
+                    <p className="text-sm text-(--cl-dark-blue)/70">
+                      {[c.email, c.phone].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveClient(c.id)}
+                    disabled={removingId === c.id}
+                    className="text-sm underline"
+                  >
+                    {removingId === c.id ? "Removing…" : "Remove"}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div>
+              <h3 className="font-medium">
+                Buyers{dealType === "rental" ? " / Tenants" : ""}
+              </h3>
+              {buyers.length === 0 && (
+                <p className="text-sm">None linked yet.</p>
+              )}
+              {buyers.map((c) => (
+                <div
+                  key={c.id}
+                  className="flex justify-between items-center border rounded p-2 mt-1"
+                >
+                  <div>
+                    <p>{c.name}</p>
+                    <p className="text-sm text-(--cl-dark-blue)/70">
+                      {[c.email, c.phone].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveClient(c.id)}
+                    disabled={removingId === c.id}
+                    className="text-sm underline"
+                  >
+                    {removingId === c.id ? "Removing…" : "Remove"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        <form
+          onSubmit={handleAddClient}
+          className="flex flex-col gap-2 border rounded p-3"
+        >
+          <span className="font-medium text-sm">Add a client</span>
+
+          <label>
+            Role
+            <select
+              value={newClientRole}
+              onChange={(e) => setNewClientRole(e.target.value as ClientRole)}
+            >
+              <option value="seller">Seller</option>
+              <option value="buyer">
+                {dealType === "rental" ? "Tenant" : "Buyer"}
+              </option>
+            </select>
+          </label>
+
+          <input
+            type="text"
+            placeholder="Name"
+            value={newClientName}
+            onChange={(e) => setNewClientName(e.target.value)}
+          />
+          <input
+            type="email"
+            placeholder="Email"
+            value={newClientEmail}
+            onChange={(e) => setNewClientEmail(e.target.value)}
+          />
+          <input
+            type="tel"
+            placeholder="Phone"
+            value={newClientPhone}
+            onChange={(e) => setNewClientPhone(e.target.value)}
+          />
+
+          <button type="submit" disabled={addingClient} className="self-start">
+            {addingClient ? "Adding…" : "Add client"}
+          </button>
+        </form>
+      </section>
     </div>
   );
 }
