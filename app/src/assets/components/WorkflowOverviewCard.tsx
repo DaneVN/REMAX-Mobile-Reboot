@@ -13,10 +13,20 @@ interface WorkflowTask {
   sort_order: number;
   created_at: string;
   description: string | null;
+  // Nested via workflow_boards -> deals. workflow_boards is a single object
+  // here (not an array) because this is a many-tasks-to-one-board embed --
+  // same for deals under it.
+  workflow_boards: {
+    deal_id: string;
+    deals: {
+      property_address: string;
+    } | null;
+  } | null;
 }
 
 const DAY_MS = 1000 * 60 * 60 * 24;
-const MAX_TASKS_SHOWN = 10;
+const MAX_TASKS_SHOWN = 8;
+const UNKNOWN_ADDRESS = "Other";
 
 function formatDueDate(dueDate: string) {
   const due = new Date(dueDate);
@@ -43,6 +53,28 @@ function formatDueDate(dueDate: string) {
   };
 }
 
+// Groups the flat, due-date-sorted task list into { address: tasks[] },
+// preserving each group's internal order (earliest due date first, since
+// the query already sorted before this runs).
+function groupTasksByAddress(
+  tasks: WorkflowTask[],
+): [string, WorkflowTask[]][] {
+  const groups = new Map<string, WorkflowTask[]>();
+
+  for (const task of tasks) {
+    const address =
+      task.workflow_boards?.deals?.property_address ?? UNKNOWN_ADDRESS;
+    const existing = groups.get(address);
+    if (existing) {
+      existing.push(task);
+    } else {
+      groups.set(address, [task]);
+    }
+  }
+
+  return Array.from(groups.entries());
+}
+
 function WorkflowOverviewCard() {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState<WorkflowTask[]>([]);
@@ -61,7 +93,8 @@ function WorkflowOverviewCard() {
       const { data, error } = await supabase
         .from("workflow_tasks")
         .select(
-          "id, board_id, title, column, due_date, template_source_id, sort_order, created_at, description",
+          `id, board_id, title, column, due_date, template_source_id, sort_order, created_at, description,
+           workflow_boards ( deal_id, deals ( property_address ) )`,
         )
         .not("due_date", "is", null)
         .neq("column", "done")
@@ -74,7 +107,7 @@ function WorkflowOverviewCard() {
         setError(error.message);
         setTasks([]);
       } else {
-        setTasks(data ?? []);
+        setTasks((data ?? []) as unknown as WorkflowTask[]);
       }
       setLoading(false);
     }
@@ -96,6 +129,8 @@ function WorkflowOverviewCard() {
       goToWorkflow();
     }
   }
+
+  const groupedTasks = groupTasksByAddress(tasks);
 
   return (
     <div
@@ -122,30 +157,37 @@ function WorkflowOverviewCard() {
       )}
 
       {!loading && !error && tasks.length > 0 && (
-        <ul className="flex flex-col gap-2">
-          {tasks.map((task) => {
-            const due = formatDueDate(task.due_date as string);
-            return (
-              <li
-                key={task.id}
-                className="flex justify-between items-center bg-(--cl-white) rounded p-2"
-              >
-                <span className="truncate mr-2">{task.title}</span>
-                <span
-                  className={
-                    due.overdue
-                      ? "text-(--cl-accent-dark) font-semibold whitespace-nowrap"
-                      : due.dueSoon
-                        ? "text-(--cl-accent) font-semibold whitespace-nowrap"
-                        : "whitespace-nowrap"
-                  }
-                >
-                  {due.label}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="flex flex-col gap-3">
+          {groupedTasks.map(([address, addressTasks]) => (
+            <div key={address}>
+              <p className="text-sm font-semibold truncate mb-1">{address}</p>
+              <ul className="flex flex-col gap-2">
+                {addressTasks.map((task) => {
+                  const due = formatDueDate(task.due_date as string);
+                  return (
+                    <li
+                      key={task.id}
+                      className="flex justify-between items-center bg-(--cl-white) rounded p-2"
+                    >
+                      <span className="truncate mr-2">{task.title}</span>
+                      <span
+                        className={
+                          due.overdue
+                            ? "text-(--cl-accent-dark) font-semibold whitespace-nowrap"
+                            : due.dueSoon
+                              ? "text-(--cl-accent) font-semibold whitespace-nowrap"
+                              : "whitespace-nowrap"
+                        }
+                      >
+                        {due.label}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
