@@ -31,7 +31,7 @@ function ArchivedDeals() {
           console.error("Failed to fetch archived deals:", error);
           setError("Couldn't load archived deals.");
         }
-        setDeals(data ?? []);
+        setDeals((data ?? []) as ArchivedDeal[]);
         setLoading(false);
       });
 

@@ -35,7 +35,7 @@ function WorkflowIndex() {
           console.error("Failed to fetch deals:", error);
           setActionError("Couldn't load your deals.");
         }
-        setDeals(data ?? []);
+        setDeals((data ?? []) as DealSummary[]);
         setLoading(false);
       });
 
@@ -116,7 +116,7 @@ function WorkflowIndex() {
               onClick={() => handleArchive(deal.id)}
               className="px-3 py-1 rounded border"
             >
-              <img src="Trash.svg" alt="Archive" className="w-4 h-4" />
+              Remove
             </button>
             {isAdmin && (
               <button
