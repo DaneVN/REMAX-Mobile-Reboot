@@ -10,7 +10,34 @@ type DealSummary = {
   property_address: string;
   deal_type: "sale" | "rental";
   status: string;
+  hasOverdueTask: boolean;
 };
+
+// Raw shape as it comes back from the nested select, before we collapse it
+// down to the flat `hasOverdueTask` boolean used for display.
+type DealRow = {
+  id: string;
+  property_address: string;
+  deal_type: string;
+  status: string;
+  workflow_boards: {
+    workflow_tasks: {
+      due_date: string | null;
+      column: string;
+    }[];
+  }[];
+};
+
+function isTaskOverdue(dueDate: string | null, column: string): boolean {
+  if (!dueDate || column === "done") return false;
+
+  const due = new Date(dueDate);
+  due.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return due.getTime() < today.getTime();
+}
 
 function WorkflowIndex() {
   // const { isAdmin } = useUserRole();
@@ -24,7 +51,10 @@ function WorkflowIndex() {
 
     supabase
       .from("deals")
-      .select("id, property_address, deal_type, status")
+      .select(
+        `id, property_address, deal_type, status,
+         workflow_boards ( workflow_tasks ( due_date, column ) )`,
+      )
       .eq("status", "active")
       .eq("is_deleted", false)
       .order("created_at", { ascending: false })
@@ -35,7 +65,22 @@ function WorkflowIndex() {
           console.error("Failed to fetch deals:", error);
           setActionError("Couldn't load your deals.");
         }
-        setDeals((data ?? []) as DealSummary[]);
+
+        const rows = (data ?? []) as unknown as DealRow[];
+        const summaries: DealSummary[] = rows.map((row) => {
+          const allTasks = row.workflow_boards.flatMap((b) => b.workflow_tasks);
+          return {
+            id: row.id,
+            property_address: row.property_address,
+            deal_type: row.deal_type as "sale" | "rental",
+            status: row.status,
+            hasOverdueTask: allTasks.some((t) =>
+              isTaskOverdue(t.due_date, t.column),
+            ),
+          };
+        });
+
+        setDeals(summaries);
         setLoading(false);
       });
 
@@ -96,12 +141,19 @@ function WorkflowIndex() {
       {deals.map((deal) => (
         <div
           key={deal.id}
-          className="bg-(--cl-white) text-(--cl-dark-blue) p-4 rounded shadow-md flex justify-between items-center"
+          className={`p-4 rounded shadow-md flex justify-between items-center ${
+            deal.hasOverdueTask
+              ? "bg-(--cl-accent-dark) text-(--cl-white) animate-pulse"
+              : "bg-(--cl-white) text-(--cl-dark-blue)"
+          }`}
         >
           <Link to={`/workflow/${deal.id}`} className="flex-1">
             <p className="font-medium">{deal.property_address}</p>
             <p className="text-sm capitalize">
               {deal.deal_type} · {deal.status}
+              {deal.hasOverdueTask && (
+                <span className="ml-2 font-semibold">⚠ Overdue task</span>
+              )}
             </p>
           </Link>
 
@@ -125,7 +177,7 @@ function WorkflowIndex() {
               >
                 Delete Permanently
               </button>
-            )} */}
+            )}  */}
           </div>
         </div>
       ))}
