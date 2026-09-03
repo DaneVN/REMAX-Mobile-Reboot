@@ -72,3 +72,34 @@ export async function moveTask(
 
   if (error) throw error;
 }
+
+export async function shiftFollowingTaskDueDates(
+  boardId: string,
+  afterSortOrder: number,
+  deltaDays: number,
+): Promise<number> {
+  const { data, error } = await supabase.rpc("shift_following_task_due_dates", {
+    p_board_id: boardId,
+    p_after_sort_order: afterSortOrder,
+    p_delta_days: deltaDays,
+  });
+
+  if (error) throw error;
+  return data ?? 0; // count of tasks actually shifted
+}
+
+export async function countFollowingShiftableTasks(
+  boardId: string,
+  afterSortOrder: number,
+): Promise<number> {
+  const { count, error } = await supabase
+    .from("workflow_tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("board_id", boardId)
+    .gt("sort_order", afterSortOrder)
+    .neq("column", "done")
+    .not("due_date", "is", null);
+
+  if (error) throw error;
+  return count ?? 0;
+}

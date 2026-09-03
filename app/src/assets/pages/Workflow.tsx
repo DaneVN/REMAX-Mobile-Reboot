@@ -148,6 +148,7 @@ function Workflow() {
       {selectedTask && (
         <TaskEditModal
           task={selectedTask}
+          boardId={board.id}
           onClose={() => setSelectedTask(null)}
           onSaved={(updatedTask) => {
             handleTaskSaved(updatedTask);
