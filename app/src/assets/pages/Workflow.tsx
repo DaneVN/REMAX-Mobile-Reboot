@@ -30,7 +30,12 @@ function Workflow() {
   const today = new Date();
 
   function showMoreTasks(column: WorkflowTask["column"]) {
-    setExpandedColumns((current) => ({ ...current, [column]: true }));
+    //toggle expanded state based on if the column is already expanded or not
+    if (expandedColumns[column]) {
+      setExpandedColumns((current) => ({ ...current, [column]: false }));
+    } else {
+      setExpandedColumns((current) => ({ ...current, [column]: true }));
+    }
   }
 
   /** Fetch workflow board for the given dealId */
@@ -132,15 +137,23 @@ function Workflow() {
                 )}
               </div>
             ))}
-            {columns[col].length > 3 && !expandedColumns[col] && (
-              <button
-                type="button"
-                className="md:hidden w-full rounded bg-(--cl-white) p-2 text-(--cl-dark-blue) shadow hover:shadow-lg transition-shadow"
-                onClick={() => showMoreTasks(col)}
-              >
-                Show more
-              </button>
-            )}
+            {
+              //if there are less than 3 tasks in the column, the button is hidden
+              columns[col].length > 3 && (
+                <button
+                  type="button"
+                  className="md:hidden w-full rounded bg-(--cl-white) p-2 text-(--cl-dark-blue) shadow hover:shadow-lg transition-shadow"
+                  onClick={() => showMoreTasks(col)}
+                >
+                  {
+                    // Toggle between showing more or less tasks based on the current state.
+                    columns[col].length > 3 && !expandedColumns[col]
+                      ? "Show more"
+                      : "Show less"
+                  }
+                </button>
+              )
+            }
           </div>
         ))}
       </div>
