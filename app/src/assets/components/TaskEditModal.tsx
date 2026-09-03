@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { supabase } from "../../lib/supabaseClient";
-import type { WorkflowTask } from "../../lib/workflow";
+import { supabase } from "../../lib/supabaseClient"; // adjust to your actual client path
+import type { WorkflowTask } from "../../lib/workflow"; // adjust to your actual types path
 import {
   countFollowingShiftableTasks,
   shiftFollowingTaskDueDates,
 } from "../../lib/workflow";
-import ConfirmDialog from "./ConfirmDialog";
+import ConfirmDialog from "./ConfirmDialog"; // adjust if not a sibling file
 
 interface TaskEditModalProps {
   task: WorkflowTask;
@@ -41,12 +41,6 @@ function TaskEditModal({
   onSaved,
   onSiblingsShifted,
 }: TaskEditModalProps) {
-  console.log("[TaskEditModal] Rendered", {
-    taskId: task.id,
-    boardId,
-    dueDate: task.due_date,
-  });
-
   const [title, setTitle] = useState(task.title);
   const [column, setColumn] = useState(task.column);
   const [dueDate, setDueDate] = useState(task.due_date ?? "");
@@ -64,13 +58,9 @@ function TaskEditModal({
 
   // Lock background scroll while the modal (or its confirmation) is open
   useEffect(() => {
-    console.log("[TaskEditModal] Locking background scroll");
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      console.log("[TaskEditModal] Restoring background scroll", {
-        originalOverflow,
-      });
       document.body.style.overflow = originalOverflow;
     };
   }, []);
@@ -79,10 +69,6 @@ function TaskEditModal({
   // shift confirmation is open, since ConfirmDialog handles its own Escape.
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      console.log("[TaskEditModal] Key pressed", {
-        key: e.key,
-        confirmationOpen: pendingShift !== null,
-      });
       if (e.key === "Escape" && !pendingShift) onClose();
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -91,24 +77,11 @@ function TaskEditModal({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    console.log("[TaskEditModal] Submit started", {
-      taskId: task.id,
-      title,
-      column,
-      dueDate,
-      hasDescription: description.length > 0,
-    });
     setSaving(true);
     setError(null);
 
     const originalDueDate = task.due_date;
     const newDueDate = dueDate === "" ? null : dueDate;
-
-    console.log("[TaskEditModal] Updating task in Supabase", {
-      taskId: task.id,
-      originalDueDate,
-      newDueDate,
-    });
 
     const { data, error } = await supabase
       .from("workflow_tasks")
@@ -127,19 +100,11 @@ function TaskEditModal({
     setSaving(false);
 
     if (error) {
-      console.log("[TaskEditModal] Task update failed", {
-        taskId: task.id,
-        error: error.message,
-      });
       setError(error.message);
       return;
     }
 
     const savedTask = data as WorkflowTask;
-    console.log("[TaskEditModal] Task update succeeded", {
-      taskId: savedTask.id,
-      dueDate: savedTask.due_date,
-    });
 
     // Only worth considering a cascade if the due date actually changed,
     // and both the old and new values are real dates (not cleared/blank --
@@ -150,37 +115,20 @@ function TaskEditModal({
       originalDueDate !== newDueDate;
 
     if (!dueDateChanged) {
-      console.log("[TaskEditModal] Due date did not change; closing modal");
       onSaved(savedTask);
       onClose();
       return;
     }
 
     const deltaDays = daysBetweenISO(originalDueDate, newDueDate);
-    console.log("[TaskEditModal] Due date changed", {
-      originalDueDate,
-      newDueDate,
-      deltaDays,
-    });
 
     try {
-      console.log("[TaskEditModal] Counting shiftable following tasks", {
-        boardId,
-        sortOrder: task.sort_order,
-      });
       const affectedCount = await countFollowingShiftableTasks(
         boardId,
         task.sort_order,
       );
 
-      console.log("[TaskEditModal] Shiftable task count received", {
-        affectedCount,
-      });
-
       if (affectedCount === 0) {
-        console.log(
-          "[TaskEditModal] No shiftable following tasks; closing modal",
-        );
         // Nothing downstream to shift (e.g. this is the last task, or
         // everything after it is already done) -- just save and close.
         onSaved(savedTask);
@@ -191,13 +139,8 @@ function TaskEditModal({
       // Hold the modal open behind the confirmation -- the task itself is
       // already saved at this point either way; this step only decides
       // whether the *following* tasks move too.
-      console.log("[TaskEditModal] Opening shift confirmation", {
-        deltaDays,
-        affectedCount,
-      });
       setPendingShift({ deltaDays, affectedCount, savedTask });
     } catch (err) {
-      console.log("[TaskEditModal] Failed to count shiftable tasks", { err });
       // If the count check itself fails, don't block on the cascade --
       // the primary task edit already succeeded, so still close normally.
       console.error("Failed to check for shiftable following tasks:", err);
@@ -207,17 +150,7 @@ function TaskEditModal({
   }
 
   async function handleConfirmShift() {
-    if (!pendingShift) {
-      console.log(
-        "[TaskEditModal] Shift confirmation ignored; no pending shift",
-      );
-      return;
-    }
-    console.log("[TaskEditModal] Shift confirmation accepted", {
-      boardId,
-      sortOrder: task.sort_order,
-      deltaDays: pendingShift.deltaDays,
-    });
+    if (!pendingShift) return;
     setShifting(true);
 
     try {
@@ -226,10 +159,8 @@ function TaskEditModal({
         task.sort_order,
         pendingShift.deltaDays,
       );
-      console.log("[TaskEditModal] Following task dates shifted successfully");
       onSiblingsShifted?.();
     } catch (err) {
-      console.log("[TaskEditModal] Following task shift failed", { err });
       console.error("Failed to shift following task due dates:", err);
       setError(
         err instanceof Error
@@ -237,7 +168,6 @@ function TaskEditModal({
           : "Task saved, but shifting other tasks failed.",
       );
     } finally {
-      console.log("[TaskEditModal] Finishing shift confirmation flow");
       setShifting(false);
       onSaved(pendingShift.savedTask);
       setPendingShift(null);
@@ -246,11 +176,7 @@ function TaskEditModal({
   }
 
   function handleDeclineShift() {
-    if (!pendingShift) {
-      console.log("[TaskEditModal] Shift decline ignored; no pending shift");
-      return;
-    }
-    console.log("[TaskEditModal] Shift confirmation declined");
+    if (!pendingShift) return;
     onSaved(pendingShift.savedTask);
     setPendingShift(null);
     onClose();
