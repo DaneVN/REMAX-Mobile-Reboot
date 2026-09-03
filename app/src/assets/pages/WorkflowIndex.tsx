@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
-import { archiveDeal, deleteDealPermanently } from "../../lib/deals";
-import { useUserRole } from "../../lib/useUserRole";
-import ConfirmDialog from "../components/ConfirmDialog";
+import { archiveDeal } from "../../lib/deals";
+// import { useUserRole } from "../../lib/useUserRole";
+// import ConfirmDialog from "../components/ConfirmDialog";
 
 type DealSummary = {
   id: string;
@@ -13,10 +13,10 @@ type DealSummary = {
 };
 
 function WorkflowIndex() {
-  const { isAdmin } = useUserRole();
+  // const { isAdmin } = useUserRole();
   const [deals, setDeals] = useState<DealSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  // const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -56,22 +56,22 @@ function WorkflowIndex() {
     }
   }
 
-  async function handleDeletePermanentlyConfirmed() {
-    if (!pendingDeleteId) return;
-    setActionError(null);
-    try {
-      await deleteDealPermanently(pendingDeleteId);
-      setDeals((prev) => prev.filter((d) => d.id !== pendingDeleteId));
-    } catch (err) {
-      setActionError(
-        err instanceof Error
-          ? err.message
-          : "Failed to permanently delete deal.",
-      );
-    } finally {
-      setPendingDeleteId(null);
-    }
-  }
+  // async function handleDeletePermanentlyConfirmed() {
+  //   if (!pendingDeleteId) return;
+  //   setActionError(null);
+  //   try {
+  //     await deleteDealPermanently(pendingDeleteId);
+  //     setDeals((prev) => prev.filter((d) => d.id !== pendingDeleteId));
+  //   } catch (err) {
+  //     setActionError(
+  //       err instanceof Error
+  //         ? err.message
+  //         : "Failed to permanently delete deal.",
+  //     );
+  //   } finally {
+  //     setPendingDeleteId(null);
+  //   }
+  // }
 
   if (loading) return <p>Loading deals…</p>;
 
@@ -118,19 +118,19 @@ function WorkflowIndex() {
             >
               Remove
             </button>
-            {isAdmin && (
+            {/* {isAdmin && (
               <button
                 onClick={() => setPendingDeleteId(deal.id)}
                 className="px-3 py-1 rounded bg-(--cl-accent-dark) text-(--cl-white)"
               >
                 Delete Permanently
               </button>
-            )}
+            )} */}
           </div>
         </div>
       ))}
 
-      <ConfirmDialog
+      {/* <ConfirmDialog
         open={pendingDeleteId !== null}
         title="Permanently delete this deal?"
         message="This will completely remove the deal, its workflow board, and all associated tasks. This cannot be undone."
@@ -138,7 +138,7 @@ function WorkflowIndex() {
         destructive
         onConfirm={handleDeletePermanentlyConfirmed}
         onCancel={() => setPendingDeleteId(null)}
-      />
+      /> */}
     </div>
   );
 }
