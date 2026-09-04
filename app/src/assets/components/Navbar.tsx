@@ -9,7 +9,7 @@ function navbar() {
           <a href="/#apps">Apps</a>
         </li>
         <li className="active:text-(--cl-accent-dark) transition-colors duration-150">
-          <a href="#crm">CRM</a>
+          <a href="/workflow">Boards</a>
         </li>
       </ul>
     </nav>

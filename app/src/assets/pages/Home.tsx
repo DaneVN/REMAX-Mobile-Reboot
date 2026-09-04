@@ -6,7 +6,6 @@ function Home() {
   return (
     <>
       <main className="flex flex-col lg:grid lg:grid-cols-2 lg:gap-4 items-baseline justify-between p-4 w-full">
-        <br className="lg:hidden" />
         <WorkflowOverviewCard />
         <br className="lg:hidden" />
         <AppCard />

@@ -4,7 +4,7 @@ function AppCard() {
   return (
     <div
       id="apps"
-      className="bg-(--cl-accent-dark) text-(--cl-white) p-4 rounded shadow-md w-full max-w-2xl"
+      className="bg-(--cl-base-dark) text-(--cl-white) p-4 rounded shadow-md w-full max-w-2xl"
     >
       <h2>App Card</h2>
       <p>Quick access to your tools.</p>
@@ -12,7 +12,7 @@ function AppCard() {
         <li>
           <Link
             to="/pipeline"
-            className="bg-(--cl-accent) text-(--cl-white) p-2 rounded shadow-md max-w-2xl items-center justify-center flex"
+            className="bg-(--cl-base) text-(--cl-base-dark) p-2 rounded shadow-md max-w-2xl items-center justify-center flex"
           >
             Pipeline
           </Link>
@@ -20,7 +20,7 @@ function AppCard() {
         <li>
           <Link
             to="/calculator"
-            className="bg-(--cl-accent) text-(--cl-white) p-2 rounded shadow-md max-w-2xl items-center justify-center flex"
+            className="bg-(--cl-base) text-(--cl-base-dark) p-2 rounded shadow-md max-w-2xl items-center justify-center flex"
           >
             Calculator
           </Link>

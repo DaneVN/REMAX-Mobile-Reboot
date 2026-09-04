@@ -78,10 +78,10 @@ function DealProgressCard() {
                     aria-valuemin={1}
                     aria-valuemax={TOTAL_STAGES}
                     aria-label={`Progress for ${deal.propertyAddress}: stage ${deal.currentStage} of ${TOTAL_STAGES}`}
-                    className="w-full h-2 bg-(--cl-accent-dark)/20 rounded overflow-hidden"
+                    className="w-full h-2 bg-(--cl-base-dark)/20 rounded overflow-hidden"
                   >
                     <div
-                      className="h-full bg-(--cl-accent-dark) rounded transition-all"
+                      className="h-full bg-(--cl-base-dark) rounded transition-all"
                       style={{ width: `${percent}%` }}
                     />
                   </div>

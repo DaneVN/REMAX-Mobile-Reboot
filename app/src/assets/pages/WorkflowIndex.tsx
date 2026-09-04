@@ -122,15 +122,18 @@ function WorkflowIndex() {
 
   return (
     <div className="flex flex-col gap-3 p-4">
-      <h1>Your Active Deals</h1>
+      <h1>Your Active Files</h1>
       <div className="flex gap-3">
         <Link
           to="/deals/new"
-          className="bg-(--cl-accent-dark) text-(--cl-white) px-4 py-2 rounded"
+          className="bg-(--cl-base-dark) text-(--cl-white) px-4 py-2 rounded"
         >
           + New Deal
         </Link>
-        <Link to="/deals/archived" className="border px-4 py-2 rounded">
+        <Link
+          to="/deals/archived"
+          className="border bg-(--cl-accent-dark) text-(--cl-white) px-4 py-2 rounded"
+        >
           View Archived
         </Link>
       </div>

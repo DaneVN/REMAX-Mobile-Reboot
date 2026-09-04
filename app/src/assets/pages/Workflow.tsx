@@ -113,9 +113,9 @@ function Workflow() {
                   (task.due_date &&
                   new Date(task.due_date) < today &&
                   task.column !== "done"
-                    ? "bg-(--cl-accent)"
-                    : "bg-(--cl-white)") +
-                  " text-(--cl-dark-blue) p-2 mb-2 rounded shadow hover:shadow-lg transition-shadow flex flex-col gap-1 cursor-pointer" +
+                    ? "bg-(--cl-accent-dark) text-(--cl-white)"
+                    : "bg-(--cl-white) text-(--cl-dark-blue)") +
+                  " p-2 mb-2 rounded shadow hover:shadow-lg transition-shadow flex flex-col gap-1 cursor-pointer" +
                   (taskIndex >= 3 && !expandedColumns[col]
                     ? " hidden md:flex"
                     : "")
@@ -142,7 +142,7 @@ function Workflow() {
               columns[col].length > 3 && (
                 <button
                   type="button"
-                  className="md:hidden w-full rounded bg-(--cl-white) p-2 text-(--cl-dark-blue) shadow hover:shadow-lg transition-shadow"
+                  className="md:hidden w-full rounded bg-(--cl-base-dark) p-2 text-(--cl-white) shadow hover:shadow-lg transition-shadow"
                   onClick={() => showMoreTasks(col)}
                 >
                   {
