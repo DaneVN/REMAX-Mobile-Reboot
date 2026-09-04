@@ -163,6 +163,10 @@ function Workflow() {
           task={selectedTask}
           boardId={board.id}
           onClose={() => setSelectedTask(null)}
+          onSiblingsShifted={() => {
+            // if task edit is saved, reload page
+            window.location.reload();
+          }}
           onSaved={(updatedTask) => {
             handleTaskSaved(updatedTask);
           }}

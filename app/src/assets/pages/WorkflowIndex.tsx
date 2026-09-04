@@ -160,13 +160,23 @@ function WorkflowIndex() {
           <div className="flex gap-2 ml-4">
             <Link
               to={`/deals/${deal.id}/edit`}
-              className="px-3 py-1 rounded border"
+              className={
+                //if the deal has overdue tasks, the button is white, otherwise it is blue
+                deal.hasOverdueTask
+                  ? "px-3 py-1 rounded border border-(--cl-white) text-(--cl-white)"
+                  : "px-3 py-1 rounded border border-(--cl-base-dark) text-(--cl-base-dark)"
+              }
             >
               Edit
             </Link>
             <button
               onClick={() => handleArchive(deal.id)}
-              className="px-3 py-1 rounded border"
+              className={
+                //if the deal has overdue tasks, the button is white, otherwise it is red
+                deal.hasOverdueTask
+                  ? "px-3 py-1 rounded border border-(--cl-white) text-(--cl-white)"
+                  : "px-3 py-1 rounded border border-(--cl-accent-dark) text-(--cl-accent-dark)"
+              }
             >
               Remove
             </button>
