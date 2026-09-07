@@ -220,6 +220,14 @@ function EditDeal() {
   async function handleRemoveClient(dealClientRowId: string) {
     setClientError(null);
     setRemovingId(dealClientRowId);
+
+    //if there is only one client left, don't allow removal
+    if (dealClients.length <= 1) {
+      setClientError("Your deal must have at least one client.");
+      setRemovingId(null);
+      return;
+    }
+
     try {
       await removeClientFromDeal(dealClientRowId);
       setDealClients((prev) => prev.filter((c) => c.id !== dealClientRowId));
@@ -253,13 +261,13 @@ function EditDeal() {
           <legend className="font-medium">Property</legend>
           <input
             type="text"
-            placeholder="Property address"
+            placeholder="Property address..."
             value={propertyAddress}
             onChange={(e) => setPropertyAddress(e.target.value)}
             required
           />
 
-          <label>
+          <label className="flex gap-1 justify-between items-center">
             Deal type
             <select
               value={dealType}
@@ -270,7 +278,7 @@ function EditDeal() {
             </select>
           </label>
 
-          <label>
+          <label className="flex gap-1 justify-between items-center">
             Status
             <select
               value={status}
@@ -282,7 +290,7 @@ function EditDeal() {
             </select>
           </label>
 
-          <label>
+          <label className="flex gap-1 justify-between items-center">
             {dealType === "sale" ? "Listing price" : "Monthly rent"}
             <input
               type="number"
@@ -294,7 +302,7 @@ function EditDeal() {
           </label>
 
           {dealType === "sale" && (
-            <label>
+            <label className="flex gap-1 justify-between items-center">
               Purchase price
               <input
                 type="number"
@@ -311,19 +319,19 @@ function EditDeal() {
           <legend className="font-medium">Attorney & bond</legend>
           <input
             type="text"
-            placeholder="Attorney name"
+            placeholder="Attorney name..."
             value={attorneyName}
             onChange={(e) => setAttorneyName(e.target.value)}
           />
           <input
             type="text"
-            placeholder="Attorney contact"
+            placeholder="Attorney contact..."
             value={attorneyContact}
             onChange={(e) => setAttorneyContact(e.target.value)}
           />
           <input
             type="text"
-            placeholder="Bond details"
+            placeholder="Bond details..."
             value={bondDetails}
             onChange={(e) => setBondDetails(e.target.value)}
           />
@@ -331,7 +339,7 @@ function EditDeal() {
 
         <fieldset className="flex flex-col gap-2">
           <legend className="font-medium">Commission</legend>
-          <label>
+          <label className="flex gap-1 justify-between items-center">
             Expected commission
             <input
               type="number"
@@ -341,7 +349,7 @@ function EditDeal() {
               onChange={(e) => setExpectedCommission(e.target.value)}
             />
           </label>
-          <label>
+          <label className="flex gap-1 justify-between items-center">
             Commission split (%)
             <input
               type="number"
@@ -352,7 +360,7 @@ function EditDeal() {
               onChange={(e) => setCommissionSplitPct(e.target.value)}
             />
           </label>
-          <label>
+          <label className="flex gap-1 justify-between items-center">
             Expected close date
             <input
               type="date"
@@ -445,7 +453,7 @@ function EditDeal() {
         >
           <span className="font-medium text-sm">Add a client</span>
 
-          <label>
+          <label className="flex gap-1 justify-between items-center">
             Role
             <select
               value={newClientRole}
@@ -460,19 +468,19 @@ function EditDeal() {
 
           <input
             type="text"
-            placeholder="Name"
+            placeholder="Name..."
             value={newClientName}
             onChange={(e) => setNewClientName(e.target.value)}
           />
           <input
             type="email"
-            placeholder="Email"
+            placeholder="Email..."
             value={newClientEmail}
             onChange={(e) => setNewClientEmail(e.target.value)}
           />
           <input
             type="tel"
-            placeholder="Phone"
+            placeholder="Phone..."
             value={newClientPhone}
             onChange={(e) => setNewClientPhone(e.target.value)}
           />

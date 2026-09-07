@@ -105,7 +105,9 @@ p {
   margin: 0;
 }
 
-input {
+input,
+select,
+textarea {
   font-family: var(--sans);
   font-size: 18px;
   line-height: 145%;

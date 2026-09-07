@@ -164,17 +164,8 @@ function NewDeal() {
     <div className="p-4 max-w-2xl mx-auto">
       <h1>New Deal</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <fieldset className="flex flex-col gap-2">
-          <legend className="font-medium">Property</legend>
-          <input
-            type="text"
-            placeholder="Property address"
-            value={propertyAddress}
-            onChange={(e) => setPropertyAddress(e.target.value)}
-            required
-          />
-
-          <label>
+        <fieldset id="property" className="flex flex-col gap-2">
+          <label className="flex gap-1 justify-between items-center">
             Deal type
             <select
               value={dealType}
@@ -184,8 +175,7 @@ function NewDeal() {
               <option value="rental">Rental</option>
             </select>
           </label>
-
-          <label>
+          <label className="flex gap-1 justify-between items-center">
             Representing
             <select
               value={representing}
@@ -198,9 +188,24 @@ function NewDeal() {
               <option value="rental">Tenant (rental)</option>
             </select>
           </label>
+          {/* //if the agent represents the seller the Property address is required,
+          if the agent represents the buyer or tenant the property address is
+          optional */}
+          <legend className="font-medium">Property</legend>
+          <input
+            type="text"
+            placeholder="Property address..."
+            value={propertyAddress}
+            onChange={(e) => setPropertyAddress(e.target.value)}
+            {...(representing === "seller" ? { required: true } : {})}
+          />
 
-          <label>
-            {dealType === "sale" ? "Listing price" : "Monthly rent"}
+          <label className="flex gap-1 justify-between items-center">
+            {representing === "seller"
+              ? "Listing price"
+              : representing === "buyer"
+                ? "Expected Price"
+                : "Rental price"}
             <input
               type="number"
               step="0.01"
@@ -209,9 +214,8 @@ function NewDeal() {
               onChange={(e) => setListingPrice(e.target.value)}
             />
           </label>
-
           {dealType === "sale" && (
-            <label>
+            <label className="flex gap-1 justify-between items-center">
               Purchase price (once agreed)
               <input
                 type="number"
@@ -224,7 +228,7 @@ function NewDeal() {
           )}
         </fieldset>
 
-        <fieldset className="flex flex-col gap-3">
+        <fieldset id="clients" className="flex flex-col gap-3">
           <legend className="font-medium">{clientLabel}(s)</legend>
 
           {clients.map((client, index) => (
@@ -246,22 +250,24 @@ function NewDeal() {
 
               <input
                 type="text"
-                placeholder={`${clientLabel} name`}
+                placeholder={`${clientLabel} name...`}
                 value={client.name}
                 onChange={(e) => updateClient(index, "name", e.target.value)}
                 required
               />
               <input
                 type="email"
-                placeholder={`${clientLabel} email`}
+                placeholder={`${clientLabel} email...`}
                 value={client.email}
                 onChange={(e) => updateClient(index, "email", e.target.value)}
+                {...(representing === "buyer" ? { required: true } : {})}
               />
               <input
                 type="tel"
-                placeholder={`${clientLabel} phone`}
+                placeholder={`${clientLabel} phone...`}
                 value={client.phone}
                 onChange={(e) => updateClient(index, "phone", e.target.value)}
+                {...(representing === "buyer" ? { required: true } : {})}
               />
             </div>
           ))}
@@ -275,37 +281,37 @@ function NewDeal() {
           </button>
         </fieldset>
 
-        <fieldset className="flex flex-col gap-2">
+        <fieldset id="attorney-bond" className="flex flex-col gap-2">
           <legend className="font-medium">Attorney & bond</legend>
           <input
             type="text"
-            placeholder="Attorney name"
+            placeholder="Attorney name..."
             value={attorneyName}
             onChange={(e) => setAttorneyName(e.target.value)}
           />
           <input
             type="email"
-            placeholder="Attorney email"
+            placeholder="Attorney email..."
             value={attorneyEmail}
             onChange={(e) => setAttorneyEmail(e.target.value)}
           />
           <input
             type="tel"
-            placeholder="Attorney phone"
+            placeholder="Attorney phone..."
             value={attorneyPhone}
             onChange={(e) => setAttorneyPhone(e.target.value)}
           />
           <input
             type="text"
-            placeholder="Bond details"
+            placeholder="Bond details..."
             value={bondDetails}
             onChange={(e) => setBondDetails(e.target.value)}
           />
         </fieldset>
 
-        <fieldset className="flex flex-col gap-2">
+        <fieldset id="commission" className="flex flex-col gap-2">
           <legend className="font-medium">Commission</legend>
-          <label>
+          <label className="flex gap-1 justify-between items-center">
             Expected commission
             <input
               type="number"
@@ -315,7 +321,7 @@ function NewDeal() {
               onChange={(e) => setExpectedCommission(e.target.value)}
             />
           </label>
-          <label>
+          <label className="flex gap-1 justify-between items-center">
             Commission split (%)
             <input
               type="number"
@@ -326,7 +332,7 @@ function NewDeal() {
               onChange={(e) => setCommissionSplitPct(e.target.value)}
             />
           </label>
-          <label>
+          <label className="flex gap-1 justify-between items-center">
             Expected close date
             <input
               type="date"
