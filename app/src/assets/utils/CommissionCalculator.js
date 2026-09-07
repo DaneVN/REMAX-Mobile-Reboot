@@ -74,7 +74,7 @@ export function AgentCommission(data) {
       }),
       nettPaymentToAgent: parseFloat(unitySplit - paye).toLocaleString(
         "en-ZA",
-        { style: "currency", currency: "ZAR" }
+        { style: "currency", currency: "ZAR" },
       ),
     };
   } else {
@@ -101,7 +101,7 @@ export function AgentCommission(data) {
         style: "currency",
         currency: "ZAR",
       }),
-      lassVAT: parseFloat(lessVat).toLocaleString("en-ZA", {
+      lessVAT: parseFloat(lessVat).toLocaleString("en-ZA", {
         style: "currency",
         currency: "ZAR",
       }),
@@ -130,7 +130,7 @@ export function AgentCommission(data) {
         {
           style: "currency",
           currency: "ZAR",
-        }
+        },
       ),
     };
   }

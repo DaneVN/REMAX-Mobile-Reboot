@@ -72,6 +72,7 @@ export default function CalculatorCard() {
                 Purchase Price:
                 <input
                   required
+                  step="0.01"
                   name="purchasePrice"
                   type="number"
                   className="mt-2 p-2 rounded border border-gray-300 w-11/12"
@@ -83,6 +84,7 @@ export default function CalculatorCard() {
                 Has Fixed Gross Amount:
                 <input
                   name="hasFixedGrossAmount"
+                  step="0.01"
                   type="checkbox"
                   checked={hasFixedGrossAmount}
                   className="ml-2"
@@ -127,6 +129,7 @@ export default function CalculatorCard() {
                 Gross Commision:{" "}
                 <input
                   name="grossCommision"
+                  step="0.01"
                   type="number"
                   className="mt-2 p-2 rounded border border-gray-300 w-11/12"
                   placeholder="..."
