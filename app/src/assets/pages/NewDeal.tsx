@@ -1,7 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../lib/AuthProvider";
 import { createDealWithBoard } from "../../lib/deals";
+import {
+  listAllAgents,
+  addAgentToDeal,
+  getDealAgents,
+  updateAgentSplit,
+  type AgentDirectoryEntry,
+} from "../../lib/dealAgents";
 import { isValidEmail, isValidPhone } from "../../lib/validators";
 
 type Representing = "seller" | "buyer" | "rental";
@@ -11,6 +18,11 @@ type ClientRow = {
   name: string;
   email: string;
   phone: string;
+};
+
+type CoAgentRow = {
+  agentId: string;
+  splitPct: string;
 };
 
 const EMPTY_CLIENT: ClientRow = { name: "", email: "", phone: "" };
@@ -40,8 +52,33 @@ function NewDeal() {
   const [commissionSplitPct, setCommissionSplitPct] = useState("");
   const [expectedCloseDate, setExpectedCloseDate] = useState("");
 
+  // -- Co-agent assignment (optional) --
+  // The creating agent is always added server-side at 100% by
+  // create_deal_with_board. If co-agents are added here, "mySplitPct" lets
+  // the creator adjust their own share down from that default so the total
+  // still makes sense.
+  const [agentDirectory, setAgentDirectory] = useState<AgentDirectoryEntry[]>(
+    [],
+  );
+  const [mySplitPct, setMySplitPct] = useState("100");
+  const [coAgents, setCoAgents] = useState<CoAgentRow[]>([]);
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    listAllAgents()
+      .then((data) => {
+        if (cancelled) return;
+        // Exclude yourself -- you're always on the deal automatically.
+        setAgentDirectory(data.filter((a) => a.id !== session?.user.id));
+      })
+      .catch((err) => console.error("Failed to load agent directory:", err));
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user.id]);
 
   const clientLabel =
     representing === "seller"
@@ -64,18 +101,43 @@ function NewDeal() {
     setClients((prev) => prev.filter((_, i) => i !== index));
   }
 
+  function addCoAgentRow() {
+    setCoAgents((prev) => [...prev, { agentId: "", splitPct: "" }]);
+  }
+
+  function updateCoAgent(
+    index: number,
+    field: keyof CoAgentRow,
+    value: string,
+  ) {
+    setCoAgents((prev) =>
+      prev.map((a, i) => (i === index ? { ...a, [field]: value } : a)),
+    );
+  }
+
+  function removeCoAgentRow(index: number) {
+    setCoAgents((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  // Agents already picked in another row are excluded from the remaining
+  // dropdowns, so the same colleague can't be added twice.
+  function availableAgentsFor(currentIndex: number) {
+    const chosenElsewhere = coAgents
+      .filter((_, i) => i !== currentIndex)
+      .map((a) => a.agentId);
+    return agentDirectory.filter((a) => !chosenElsewhere.includes(a.id));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!session) return;
 
     const trimmedAddress = propertyAddress.trim();
-    if (!trimmedAddress) {
+    if (representing === "seller" && !trimmedAddress) {
       setError("Property address is required.");
       return;
     }
 
-    // Every client row needs at least a name; email/phone stay optional but
-    // must be valid format if the agent entered something.
     const trimmedClients = clients.map((c) => ({
       name: c.name.trim(),
       email: c.email.trim(),
@@ -106,6 +168,30 @@ function NewDeal() {
     if (attorneyEmail && !isValidEmail(attorneyEmail)) {
       setError("Please enter a valid attorney email address.");
       return;
+    }
+
+    // Only validate co-agent splits if any were actually added -- a solo
+    // deal never needs to think about this at all.
+    if (coAgents.length > 0) {
+      if (coAgents.some((a) => !a.agentId)) {
+        setError(
+          "Select an agent for every added row (or remove the empty row).",
+        );
+        return;
+      }
+      const mySplit = parseFloat(mySplitPct);
+      const coSplits = coAgents.map((a) => parseFloat(a.splitPct));
+      if (Number.isNaN(mySplit) || coSplits.some((s) => Number.isNaN(s))) {
+        setError("Enter a commission split for every agent.");
+        return;
+      }
+      const total = mySplit + coSplits.reduce((sum, s) => sum + s, 0);
+      if (Math.round(total * 100) / 100 !== 100) {
+        setError(
+          `Agent commission splits must add up to 100% (currently ${total}%).`,
+        );
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -148,6 +234,21 @@ function NewDeal() {
           : undefined,
         expectedCloseDate: expectedCloseDate || undefined,
       });
+
+      // The creator is already on the deal at 100% (set server-side by
+      // create_deal_with_board). If co-agents were added, adjust the
+      // creator's own split down and add each co-agent's row.
+      if (coAgents.length > 0) {
+        const myRow = (await getDealAgents(dealId)).find(
+          (a) => a.agentId === session.user.id,
+        );
+        if (myRow) {
+          await updateAgentSplit(myRow.id, parseFloat(mySplitPct));
+        }
+        for (const a of coAgents) {
+          await addAgentToDeal(dealId, a.agentId, parseFloat(a.splitPct));
+        }
+      }
 
       navigate(`/workflow/${dealId}`);
     } catch (err) {
@@ -278,6 +379,81 @@ function NewDeal() {
             className="self-start text-sm underline"
           >
             + Add another {clientLabel.toLowerCase()}
+          </button>
+        </fieldset>
+
+        <fieldset id="agents" className="flex flex-col gap-3">
+          <legend className="font-medium">Agents on this deal</legend>
+          <p className="text-sm text-(--cl-dark-blue)/70">
+            You're added automatically. Add colleagues here only if this deal is
+            shared -- otherwise leave this section empty.
+          </p>
+
+          {coAgents.length > 0 && (
+            <label className="flex gap-1 justify-between items-center">
+              Your split (%)
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                value={mySplitPct}
+                onChange={(e) => setMySplitPct(e.target.value)}
+              />
+            </label>
+          )}
+
+          {coAgents.map((agent, index) => (
+            <div
+              key={index}
+              className="flex gap-2 items-center border rounded p-3"
+            >
+              <select
+                value={agent.agentId}
+                onChange={(e) =>
+                  updateCoAgent(index, "agentId", e.target.value)
+                }
+                className="flex-1"
+                required
+              >
+                <option value="" disabled>
+                  Select a colleague…
+                </option>
+                {availableAgentsFor(index).map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.fullName}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                placeholder="Split %"
+                value={agent.splitPct}
+                onChange={(e) =>
+                  updateCoAgent(index, "splitPct", e.target.value)
+                }
+                className="w-24"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => removeCoAgentRow(index)}
+                className="text-sm underline"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={addCoAgentRow}
+            className="self-start text-sm underline"
+          >
+            + Add another agent
           </button>
         </fieldset>
 

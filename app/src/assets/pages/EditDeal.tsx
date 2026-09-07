@@ -8,7 +8,17 @@ import {
   removeClientFromDeal,
   type DealClient,
 } from "../../lib/deals";
+import {
+  getDealAgents,
+  listAllAgents,
+  addAgentToDeal,
+  updateAgentSplit,
+  removeAgentFromDeal,
+  type DealAgent,
+  type AgentDirectoryEntry,
+} from "../../lib/dealAgents";
 import { isValidEmail, isValidPhone } from "../../lib/validators";
+import { useAuth } from "../../lib/AuthProvider";
 
 type DealType = "sale" | "rental";
 type DealStatus = "active" | "closed" | "fell_through";
@@ -32,6 +42,7 @@ type DealRow = {
 function EditDeal() {
   const { dealId } = useParams<{ dealId: string }>();
   const navigate = useNavigate();
+  const { session } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -61,6 +72,21 @@ function EditDeal() {
   const [newClientEmail, setNewClientEmail] = useState("");
   const [newClientPhone, setNewClientPhone] = useState("");
   const [addingClient, setAddingClient] = useState(false);
+
+  // -- Agent management state --
+  const [dealAgents, setDealAgents] = useState<DealAgent[]>([]);
+  const [agentsLoading, setAgentsLoading] = useState(true);
+  const [agentError, setAgentError] = useState<string | null>(null);
+  const [removingAgentId, setRemovingAgentId] = useState<string | null>(null);
+  const [savingSplitId, setSavingSplitId] = useState<string | null>(null);
+  const [splitDrafts, setSplitDrafts] = useState<Record<string, string>>({});
+
+  const [agentDirectory, setAgentDirectory] = useState<AgentDirectoryEntry[]>(
+    [],
+  );
+  const [newAgentId, setNewAgentId] = useState("");
+  const [newAgentSplit, setNewAgentSplit] = useState("");
+  const [addingAgent, setAddingAgent] = useState(false);
 
   useEffect(() => {
     if (!dealId) return;
@@ -124,6 +150,53 @@ function EditDeal() {
     };
   }, [dealId]);
 
+  useEffect(() => {
+    if (!dealId) return;
+    let cancelled = false;
+
+    getDealAgents(dealId)
+      .then((data) => {
+        if (cancelled) return;
+        setDealAgents(data);
+        setSplitDrafts(
+          Object.fromEntries(
+            data.map((agent) => [
+              agent.id,
+              agent.commissionSplitPct.toString(),
+            ]),
+          ),
+        );
+        setAgentsLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("Failed to load deal agents:", err);
+        setAgentError("Couldn't load agents for this deal.");
+        setAgentsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dealId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    listAllAgents()
+      .then((data) => {
+        if (cancelled) return;
+        setAgentDirectory(data);
+      })
+      .catch((err) => {
+        console.error("Failed to load agent directory:", err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!dealId) return;
@@ -186,8 +259,6 @@ function EditDeal() {
     setAddingClient(true);
 
     try {
-      // Tenants are stored under the "buyer" role on rental deals, per the
-      // existing convention -- mirrors the mapping used in NewDeal.tsx.
       const clientType =
         newClientRole === "seller"
           ? "seller"
@@ -221,7 +292,6 @@ function EditDeal() {
     setClientError(null);
     setRemovingId(dealClientRowId);
 
-    //if there is only one client left, don't allow removal
     if (dealClients.length <= 1) {
       setClientError("Your deal must have at least one client.");
       setRemovingId(null);
@@ -237,6 +307,116 @@ function EditDeal() {
       );
     } finally {
       setRemovingId(null);
+    }
+  }
+
+  // Agents already on this deal are excluded from the "add" picker --
+  // deal_agents has a unique(deal_id, agent_id) constraint, so re-adding
+  // one would fail anyway; filtering here just avoids offering it at all.
+  const availableAgents = agentDirectory.filter(
+    (a) => !dealAgents.some((da) => da.agentId === a.id),
+  );
+
+  const totalSplitPct = dealAgents.reduce((sum, a) => {
+    const split = parseFloat(
+      splitDrafts[a.id] ?? a.commissionSplitPct.toString(),
+    );
+    return Number.isNaN(split) ? sum : sum + split;
+  }, 0);
+
+  async function handleAddAgent(e: React.FormEvent) {
+    e.preventDefault();
+    if (!dealId || !newAgentId) return;
+
+    const splitValue = parseFloat(newAgentSplit);
+    if (Number.isNaN(splitValue) || splitValue < 0 || splitValue > 100) {
+      setAgentError("Enter a commission split between 0 and 100.");
+      return;
+    }
+
+    setAgentError(null);
+    setAddingAgent(true);
+
+    try {
+      await addAgentToDeal(dealId, newAgentId, splitValue);
+      const refreshed = await getDealAgents(dealId);
+      setDealAgents(refreshed);
+      setSplitDrafts(
+        Object.fromEntries(
+          refreshed.map((agent) => [
+            agent.id,
+            agent.commissionSplitPct.toString(),
+          ]),
+        ),
+      );
+      setNewAgentId("");
+      setNewAgentSplit("");
+    } catch (err) {
+      setAgentError(
+        err instanceof Error ? err.message : "Failed to add agent.",
+      );
+    } finally {
+      setAddingAgent(false);
+    }
+  }
+
+  function handleSplitChange(dealAgentRowId: string, value: string) {
+    setSplitDrafts((prev) => ({ ...prev, [dealAgentRowId]: value }));
+    setAgentError(null);
+  }
+
+  async function handleUpdateSplit(dealAgentRowId: string) {
+    const value = splitDrafts[dealAgentRowId] ?? "";
+    const splitValue = parseFloat(value);
+    if (Number.isNaN(splitValue) || splitValue < 0 || splitValue > 100) {
+      setAgentError("Enter a commission split between 0 and 100.");
+      return;
+    }
+
+    setSavingSplitId(dealAgentRowId);
+    setAgentError(null);
+
+    try {
+      await updateAgentSplit(dealAgentRowId, splitValue);
+      setDealAgents((prev) =>
+        prev.map((a) =>
+          a.id === dealAgentRowId
+            ? { ...a, commissionSplitPct: splitValue }
+            : a,
+        ),
+      );
+    } catch (err) {
+      setAgentError(
+        err instanceof Error ? err.message : "Failed to update split.",
+      );
+    } finally {
+      setSavingSplitId(null);
+    }
+  }
+
+  async function handleRemoveAgent(dealAgentRowId: string) {
+    setAgentError(null);
+
+    if (dealAgents.length <= 1) {
+      setAgentError("A deal must have at least one assigned agent.");
+      return;
+    }
+
+    setRemovingAgentId(dealAgentRowId);
+    try {
+      await removeAgentFromDeal(dealAgentRowId);
+      setDealAgents((prev) => prev.filter((a) => a.id !== dealAgentRowId));
+      setSplitDrafts((prev) => {
+        const next = { ...prev };
+        delete next[dealAgentRowId];
+        return next;
+      });
+    } catch (err) {
+      setAgentError(
+        err instanceof Error ? err.message : "Failed to remove agent.",
+      );
+    } finally {
+      setRemovingAgentId(null);
     }
   }
 
@@ -350,7 +530,7 @@ function EditDeal() {
             />
           </label>
           <label className="flex gap-1 justify-between items-center">
-            Commission split (%)
+            Commission split with another agency(%)
             <input
               type="number"
               step="0.01"
@@ -372,10 +552,128 @@ function EditDeal() {
 
         {error && <p className="text-red-600">{error}</p>}
 
-        <button type="submit" disabled={submitting}>
+        <button
+          type="submit"
+          disabled={submitting}
+          className="bg-(--cl-base-dark) text-white px-4 py-2 rounded"
+        >
           {submitting ? "Saving…" : "Save Changes"}
         </button>
       </form>
+
+      <hr className="my-6" />
+
+      <section className="flex flex-col gap-4">
+        <h2>Agents on this deal</h2>
+        <p className="text-sm text-(--cl-dark-blue)/70">
+          Internal split of the office's own commission share between assigned
+          agents - separate from the Commission split (%) above, which is the
+          office-vs-external-agent split.
+        </p>
+
+        {agentError && <p className="text-red-600">{agentError}</p>}
+        {agentsLoading && <p>Loading agents…</p>}
+
+        {!agentsLoading && (
+          <>
+            {dealAgents.map((a) => (
+              <div
+                key={a.id}
+                className="flex justify-between items-center border rounded p-2"
+              >
+                <div>
+                  <p>
+                    {a.fullName}
+                    {a.agentId === session?.user.id && (
+                      <span className="text-sm text-(--cl-dark-blue)/60">
+                        {" "}
+                        (you)
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={splitDrafts[a.id] ?? a.commissionSplitPct}
+                    onChange={(e) => handleSplitChange(a.id, e.target.value)}
+                    onBlur={() => void handleUpdateSplit(a.id)}
+                    className="w-20 border rounded p-1 text-right"
+                  />
+                  <span className="text-sm">
+                    {savingSplitId === a.id ? "Saving…" : "%"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveAgent(a.id)}
+                    disabled={removingAgentId === a.id}
+                    className="text-sm underline"
+                  >
+                    {removingAgentId === a.id ? "Removing…" : "Remove"}
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            <p
+              className={`text-sm ${totalSplitPct === 100 ? "text-(--cl-dark-blue)/70" : "text-red-600"}`}
+            >
+              Total split: {totalSplitPct.toFixed(2)}%
+              {Math.round(totalSplitPct * 100) / 100 !== 100 &&
+                " (should add up to 100%)"}
+            </p>
+          </>
+        )}
+
+        <form
+          onSubmit={handleAddAgent}
+          className="flex flex-col gap-2 border rounded p-3"
+        >
+          <span className="font-medium text-sm">Add an agent</span>
+
+          <label className="flex gap-1 justify-between items-center">
+            Agent
+            <select
+              value={newAgentId}
+              onChange={(e) => setNewAgentId(e.target.value)}
+              required
+            >
+              <option value="" disabled>
+                Select a colleague…
+              </option>
+              {availableAgents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.fullName}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex gap-1 justify-between items-center">
+            Commission split (%)
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={newAgentSplit}
+              disabled={!newAgentId}
+              onChange={(e) => setNewAgentSplit(e.target.value)}
+              required
+            />
+          </label>
+
+          <button
+            type="submit"
+            disabled={addingAgent || !newAgentId}
+            className="bg-(--cl-base-dark) text-white px-4 py-2 rounded"
+          >
+            {addingAgent ? "Adding…" : "Add agent"}
+          </button>
+        </form>
+      </section>
 
       <hr className="my-6" />
 
@@ -485,7 +783,11 @@ function EditDeal() {
             onChange={(e) => setNewClientPhone(e.target.value)}
           />
 
-          <button type="submit" disabled={addingClient} className="self-start">
+          <button
+            type="submit"
+            disabled={addingClient}
+            className="bg-(--cl-base-dark) text-white px-4 py-2 rounded"
+          >
             {addingClient ? "Adding…" : "Add client"}
           </button>
         </form>
