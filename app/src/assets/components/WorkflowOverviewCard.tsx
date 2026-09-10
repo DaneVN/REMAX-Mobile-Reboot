@@ -20,6 +20,7 @@ interface WorkflowTask {
     deal_id: string;
     deals: {
       property_address: string;
+      buyer_id: string;
     } | null;
   } | null;
 }
@@ -63,7 +64,9 @@ function groupTasksByAddress(
 
   for (const task of tasks) {
     const address =
-      task.workflow_boards?.deals?.property_address ?? UNKNOWN_ADDRESS;
+      task.workflow_boards?.deals?.property_address ??
+      task.workflow_boards?.deals?.buyer_id ??
+      UNKNOWN_ADDRESS;
     const existing = groups.get(address);
     if (existing) {
       existing.push(task);

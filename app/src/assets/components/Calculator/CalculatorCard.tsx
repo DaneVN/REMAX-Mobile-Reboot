@@ -99,15 +99,16 @@ export default function CalculatorCard() {
                 }`}
               >
                 <label className="text-lg font-semibold">
-                  % Commision on Purchase Price:
+                  Comm % excluding VAT (on OTP):
                   <input
                     name="commissionOnPurchasePrice"
                     type="number"
                     className="mt-2 p-2 rounded border border-gray-300 w-11/12"
                     placeholder="..."
+                    defaultValue={5}
+                    step="0.01"
                     min={0}
-                  />{" "}
-                  %
+                  />
                 </label>
                 <label className="text-lg font-semibold">
                   % Commission to you:{" "}
@@ -115,9 +116,11 @@ export default function CalculatorCard() {
                     name="agentSplit"
                     className="mt-2 p-2 rounded border border-gray-300 w-11/12"
                     placeholder="..."
+                    defaultValue={100}
+                    type="number"
+                    step="0.01"
                     min={0}
-                  />{" "}
-                  %
+                  />
                 </label>
               </div>
 
