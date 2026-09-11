@@ -74,16 +74,42 @@ function Login() {
               >
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="px-4 py-2 border border-(--cl-base) rounded-lg focus:outline-none focus:ring-2 focus:ring-(--cl-accent) focus:border-transparent transition-all"
-              />
+              <div className="flex items-center gap-2">
+                <input
+                  //toggle the hidden chacracters if the user clicks on the eye icon
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="px-4 py-2 w-full border border-(--cl-base) rounded-lg focus:outline-none focus:ring-2 focus:ring-(--cl-accent) focus:border-transparent transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const passwordInput = document.getElementById(
+                      "password",
+                    ) as HTMLInputElement;
+                    if (passwordInput) {
+                      passwordInput.type =
+                        passwordInput.type === "password" ? "text" : "password";
+                    }
+                  }}
+                >
+                  {/* Eye icon */}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    height="24"
+                  >
+                    <path fill="none" d="M0 0h24v24H0z" />
+                    <path d="M12 4.5C7.305 4.5 3.135 7.36 1.5 12c1.635 4.64 5.805 7.5 10.5 7.5s8.865-2.86 10.5-7.5c-1.635-4.64-5.805-7.5-10.5-7.5zm0 13c-3.038 0-5.5-2.462-5.5-5.5S8.962 6.5 12 6.5s5.5 2.462 5.5 5.5-2.462 5.5-5.5 5.5zm0-9c-1.93 0-3.5 1.57-3.5 3.5s1.57 3.5 3.5 3.5 3.5-1.57 3.5-3.5-1.57-3.5-3.5-3.5z" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {/* Error Message */}
