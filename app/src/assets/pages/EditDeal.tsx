@@ -19,6 +19,7 @@ import {
 } from "../../lib/dealAgents";
 import { isValidEmail, isValidPhone } from "../../lib/validators";
 import { useAuth } from "../../lib/AuthProvider";
+import AttorneyPicker from "../components/AttorneyPicker";
 
 type DealType = "sale" | "rental";
 type DealStatus = "active" | "closed" | "fell_through";
@@ -29,8 +30,7 @@ type DealRow = {
   property_address: string;
   deal_type: DealType;
   status: DealStatus;
-  attorney_name: string | null;
-  attorney_contact: string | null;
+  attorney_id: string | null;
   bond_details: string | null;
   listing_price: number | null;
   purchase_price: number | null;
@@ -52,8 +52,7 @@ function EditDeal() {
   const [propertyAddress, setPropertyAddress] = useState("");
   const [dealType, setDealType] = useState<DealType>("sale");
   const [status, setStatus] = useState<DealStatus>("active");
-  const [attorneyName, setAttorneyName] = useState("");
-  const [attorneyContact, setAttorneyContact] = useState("");
+  const [attorneyId, setAttorneyId] = useState("");
   const [bondDetails, setBondDetails] = useState("");
   const [listingPrice, setListingPrice] = useState("");
   const [purchasePrice, setPurchasePrice] = useState("");
@@ -95,7 +94,7 @@ function EditDeal() {
     supabase
       .from("deals")
       .select(
-        "id, property_address, deal_type, status, attorney_name, attorney_contact, bond_details, listing_price, purchase_price, expected_commission, commission_split_pct, expected_close_date",
+        "id, property_address, deal_type, status, attorney_id, bond_details, listing_price, purchase_price, expected_commission, commission_split_pct, expected_close_date",
       )
       .eq("id", dealId)
       .single()
@@ -112,8 +111,7 @@ function EditDeal() {
         setPropertyAddress(deal.property_address);
         setDealType(deal.deal_type);
         setStatus(deal.status);
-        setAttorneyName(deal.attorney_name ?? "");
-        setAttorneyContact(deal.attorney_contact ?? "");
+        setAttorneyId(deal.attorney_id ?? "");
         setBondDetails(deal.bond_details ?? "");
         setListingPrice(deal.listing_price?.toString() ?? "");
         setPurchasePrice(deal.purchase_price?.toString() ?? "");
@@ -209,8 +207,7 @@ function EditDeal() {
         propertyAddress,
         dealType,
         status,
-        attorneyName: attorneyName || undefined,
-        attorneyContact: attorneyContact || undefined,
+        attorneyId: attorneyId || undefined,
         bondDetails: bondDetails || undefined,
         listingPrice: listingPrice ? parseFloat(listingPrice) : undefined,
         purchasePrice: purchasePrice ? parseFloat(purchasePrice) : undefined,
@@ -389,6 +386,10 @@ function EditDeal() {
       setAgentError(
         err instanceof Error ? err.message : "Failed to update split.",
       );
+      if (dealId) {
+        const refreshed = await getDealAgents(dealId);
+        setDealAgents(refreshed);
+      }
     } finally {
       setSavingSplitId(null);
     }
@@ -497,18 +498,7 @@ function EditDeal() {
 
         <fieldset className="flex flex-col gap-2">
           <legend className="font-medium">Attorney & bond</legend>
-          <input
-            type="text"
-            placeholder="Attorney name..."
-            value={attorneyName}
-            onChange={(e) => setAttorneyName(e.target.value)}
-          />
-          <input
-            type="text"
-            placeholder="Attorney contact..."
-            value={attorneyContact}
-            onChange={(e) => setAttorneyContact(e.target.value)}
-          />
+          <AttorneyPicker value={attorneyId} onChange={setAttorneyId} />
           <input
             type="text"
             placeholder="Bond details..."
@@ -658,6 +648,7 @@ function EditDeal() {
               type="number"
               step="0.01"
               min="0"
+              max="100"
               value={newAgentSplit}
               disabled={!newAgentId}
               onChange={(e) => setNewAgentSplit(e.target.value)}

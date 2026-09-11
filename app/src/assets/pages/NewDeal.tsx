@@ -9,6 +9,7 @@ import {
   updateAgentSplit,
   type AgentDirectoryEntry,
 } from "../../lib/dealAgents";
+import AttorneyPicker from "../components/AttorneyPicker";
 import { isValidEmail, isValidPhone } from "../../lib/validators";
 
 type Representing = "seller" | "buyer" | "rental";
@@ -41,9 +42,7 @@ function NewDeal() {
   // added later once they're known, via the Edit Deal page).
   const [clients, setClients] = useState<ClientRow[]>([{ ...EMPTY_CLIENT }]);
 
-  const [attorneyName, setAttorneyName] = useState("");
-  const [attorneyEmail, setAttorneyEmail] = useState("");
-  const [attorneyPhone, setAttorneyPhone] = useState("");
+  const [attorneyId, setAttorneyId] = useState("");
   const [bondDetails, setBondDetails] = useState("");
 
   const [listingPrice, setListingPrice] = useState("");
@@ -161,15 +160,6 @@ function NewDeal() {
       }
     }
 
-    if (attorneyPhone && !isValidPhone(attorneyPhone)) {
-      setError("Please enter a valid 10-digit attorney phone number.");
-      return;
-    }
-    if (attorneyEmail && !isValidEmail(attorneyEmail)) {
-      setError("Please enter a valid attorney email address.");
-      return;
-    }
-
     // Only validate co-agent splits if any were actually added -- a solo
     // deal never needs to think about this at all.
     if (coAgents.length > 0) {
@@ -219,10 +209,7 @@ function NewDeal() {
           representing === "buyer" || representing === "rental"
             ? clientInputs
             : undefined,
-        attorneyName: attorneyName.trim() || undefined,
-        attorneyContact:
-          [attorneyEmail, attorneyPhone].filter(Boolean).join(" / ") ||
-          undefined,
+        attorneyId: attorneyId || undefined,
         bondDetails: bondDetails.trim() || undefined,
         listingPrice: listingPrice ? parseFloat(listingPrice) : undefined,
         purchasePrice: purchasePrice ? parseFloat(purchasePrice) : undefined,
@@ -459,24 +446,7 @@ function NewDeal() {
 
         <fieldset id="attorney-bond" className="flex flex-col gap-2">
           <legend className="font-medium">Attorney & bond</legend>
-          <input
-            type="text"
-            placeholder="Attorney name..."
-            value={attorneyName}
-            onChange={(e) => setAttorneyName(e.target.value)}
-          />
-          <input
-            type="email"
-            placeholder="Attorney email..."
-            value={attorneyEmail}
-            onChange={(e) => setAttorneyEmail(e.target.value)}
-          />
-          <input
-            type="tel"
-            placeholder="Attorney phone..."
-            value={attorneyPhone}
-            onChange={(e) => setAttorneyPhone(e.target.value)}
-          />
+          <AttorneyPicker value={attorneyId} onChange={setAttorneyId} />
           <input
             type="text"
             placeholder="Bond details..."
@@ -520,7 +490,11 @@ function NewDeal() {
 
         {error && <p className="text-red-600">{error}</p>}
 
-        <button type="submit" disabled={submitting}>
+        <button
+          type="submit"
+          disabled={submitting}
+          className="bg-(--cl-base-dark) text-white px-4 py-2 rounded"
+        >
           {submitting ? "Creating…" : "Create Deal"}
         </button>
       </form>
