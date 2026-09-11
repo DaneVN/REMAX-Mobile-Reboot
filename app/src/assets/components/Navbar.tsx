@@ -26,7 +26,16 @@ function Navbar() {
       <nav className="bg-(--cl-base-dark) text-(--cl-white) p-4 shadow-md">
         <ul className="flex space-x-4 justify-between items-center max-w-7xl mx-auto">
           {/* Navigation Links */}
-          <div className="flex space-x-6">
+          {/* Make the links collapse into a dropdown when in mobile view */}
+          <select
+            className="block sm:hidden bg-(--cl-base-dark) text-(--cl-white) p-2 rounded"
+            onChange={(e) => navigate(e.target.value)}
+          >
+            <option value="/">Home</option>
+            <option value="/workflow">Boards</option>
+            <option value="/calculator">Calculator</option>
+          </select>
+          <div className="hidden sm:flex sm:space-x-6">
             <li>
               <a
                 href="/"
@@ -55,7 +64,7 @@ function Navbar() {
 
           {/* User Section */}
           {session && (
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4">
               <span className="text-(--cl-base) text-sm">
                 {session.user.email}
               </span>
