@@ -23,7 +23,8 @@ export async function getActiveDealsProgress(): Promise<DealProgress[]> {
       )
     `,
     )
-    .eq("status", "active");
+    .eq("status", "active")
+    .eq("is_deleted", false);
 
   if (error) throw error;
 

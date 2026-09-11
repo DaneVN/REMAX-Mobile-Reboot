@@ -20,7 +20,8 @@ interface WorkflowTask {
     deal_id: string;
     deals: {
       property_address: string;
-      buyer_id: string;
+      status: string | null;
+      is_deleted: boolean | null;
     } | null;
   } | null;
 }
@@ -64,9 +65,7 @@ function groupTasksByAddress(
 
   for (const task of tasks) {
     const address =
-      task.workflow_boards?.deals?.property_address ??
-      task.workflow_boards?.deals?.buyer_id ??
-      UNKNOWN_ADDRESS;
+      task.workflow_boards?.deals?.property_address ?? UNKNOWN_ADDRESS;
     const existing = groups.get(address);
     if (existing) {
       existing.push(task);
@@ -97,8 +96,10 @@ function WorkflowOverviewCard() {
         .from("workflow_tasks")
         .select(
           `id, board_id, title, column, due_date, template_source_id, sort_order, created_at, description,
-           workflow_boards ( deal_id, deals ( property_address ) )`,
+           workflow_boards ( deal_id, deals ( property_address, status, is_deleted ) )`,
         )
+        .eq("workflow_boards.deals.status", "active")
+        .eq("workflow_boards.deals.is_deleted", false)
         .not("due_date", "is", null)
         .neq("column", "done")
         .order("due_date", { ascending: true })
@@ -110,7 +111,18 @@ function WorkflowOverviewCard() {
         setError(error.message);
         setTasks([]);
       } else {
-        setTasks((data ?? []) as unknown as WorkflowTask[]);
+        const visibleTasks = ((data ?? []) as unknown as WorkflowTask[]).filter(
+          (task) => {
+            const deal = task.workflow_boards?.deals;
+            return (
+              deal?.status === "active" &&
+              deal?.is_deleted === false &&
+              task.column !== "done"
+            );
+          },
+        );
+
+        setTasks(visibleTasks);
       }
       setLoading(false);
     }
