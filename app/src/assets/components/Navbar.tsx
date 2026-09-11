@@ -31,6 +31,7 @@ function Navbar() {
             className="block sm:hidden bg-(--cl-base-dark) text-(--cl-white) p-2 rounded"
             onChange={(e) => navigate(e.target.value)}
           >
+            <option value="">...</option>
             <option value="/">Home</option>
             <option value="/workflow">Boards</option>
             <option value="/calculator">Calculator</option>
