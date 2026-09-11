@@ -1,19 +1,87 @@
-function navbar() {
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../lib/AuthProvider";
+import { supabase } from "../../lib/supabaseClient";
+import ConfirmDialog from "./ConfirmDialog";
+
+function Navbar() {
+  const { session } = useAuth();
+  const navigate = useNavigate();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    try {
+      await supabase.auth.signOut();
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+      setLoggingOut(false);
+    }
+  }
+
   return (
-    <nav>
-      <ul className="flex space-x-4 justify-around bg-(--cl-base-dark) text-(--cl-white) p-4">
-        <li className="active:text-(--cl-accent-dark) transition-colors duration-150">
-          <a href="/">Home</a>
-        </li>
-        <li className="active:text-(--cl-accent-dark) transition-colors duration-150">
-          <a href="/#apps">Apps</a>
-        </li>
-        <li className="active:text-(--cl-accent-dark) transition-colors duration-150">
-          <a href="/workflow">Boards</a>
-        </li>
-      </ul>
-    </nav>
+    <>
+      <nav className="bg-(--cl-base-dark) text-(--cl-white) p-4 shadow-md">
+        <ul className="flex space-x-4 justify-between items-center max-w-7xl mx-auto">
+          {/* Navigation Links */}
+          <div className="flex space-x-6">
+            <li>
+              <a
+                href="/"
+                className="hover:text-(--cl-accent) transition-colors duration-150"
+              >
+                Home
+              </a>
+            </li>
+            <li>
+              <a
+                href="/workflow"
+                className="hover:text-(--cl-accent) transition-colors duration-150"
+              >
+                Boards
+              </a>
+            </li>
+            <li>
+              <a
+                href="/calculator"
+                className="hover:text-(--cl-accent) transition-colors duration-150"
+              >
+                Calculator
+              </a>
+            </li>
+          </div>
+
+          {/* User Section */}
+          {session && (
+            <div className="flex items-center gap-4">
+              <span className="text-(--cl-base) text-sm">
+                {session.user.email}
+              </span>
+              <button
+                onClick={() => setShowLogoutConfirm(true)}
+                className="px-3 py-1 rounded border border-(--cl-accent) text-(--cl-white) hover:bg-(--cl-accent) hover:text-(--cl-white) transition-colors duration-150"
+              >
+                Log Out
+              </button>
+            </div>
+          )}
+        </ul>
+      </nav>
+
+      {/* Logout Confirmation Dialog */}
+      <ConfirmDialog
+        open={showLogoutConfirm}
+        title="Sign Out?"
+        message="Are you sure you want to sign out of RE/MAX Unity?"
+        confirmLabel={loggingOut ? "Signing out..." : "Sign Out"}
+        cancelLabel="Cancel"
+        onConfirm={handleLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
+    </>
   );
 }
 
-export default navbar;
+export default Navbar;
