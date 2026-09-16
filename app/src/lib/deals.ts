@@ -4,12 +4,14 @@ import { supabase } from "./supabaseClient";
 // Types
 // ---------------------------------------------------------------------------
 
-type NewClientInput = {
-  name: string;
-  email?: string;
-  phone?: string;
-  type: "buyer" | "seller" | "tenant";
-};
+type NewClientInput =
+  | { existingId: string } // reuse an existing clients row
+  | {
+      name: string;
+      email?: string;
+      phone?: string;
+      type: "buyer" | "seller" | "tenant";
+    };
 
 type NewDealInput = {
   agentId: string;
@@ -54,6 +56,10 @@ export type DealClient = {
 // ---------------------------------------------------------------------------
 
 async function insertClient(client: NewClientInput) {
+  if ("existingId" in client) {
+    return client.existingId;
+  }
+
   const { data, error } = await supabase
     .from("clients")
     .insert({
@@ -73,11 +79,14 @@ async function insertClients(clients: NewClientInput[] | undefined) {
   if (!clients || clients.length === 0) return [];
   const ids: string[] = [];
   for (const client of clients) {
-    ids.push(await insertClient(client));
+    if ("existingId" in client) {
+      ids.push(client.existingId); // already exists, just reuse the id
+    } else {
+      ids.push(await insertClient(client));
+    }
   }
   return ids;
 }
-
 // ---------------------------------------------------------------------------
 // Create -- deal + board + tasks + client links, atomically, via RPC
 // ---------------------------------------------------------------------------

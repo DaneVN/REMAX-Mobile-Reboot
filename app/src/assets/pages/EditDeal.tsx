@@ -20,6 +20,7 @@ import {
 import { isValidEmail, isValidPhone } from "../../lib/validators";
 import { useAuth } from "../../lib/AuthProvider";
 import AttorneyPicker from "../components/AttorneyPicker";
+import ConfirmDialog from "../components/ConfirmDialog";
 
 type DealType = "sale" | "rental";
 type DealStatus = "active" | "closed" | "fell_through";
@@ -71,6 +72,13 @@ function EditDeal() {
   const [newClientEmail, setNewClientEmail] = useState("");
   const [newClientPhone, setNewClientPhone] = useState("");
   const [addingClient, setAddingClient] = useState(false);
+  const [duplicateClient, setDuplicateClient] = useState<{
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+  } | null>(null);
+  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
 
   // -- Agent management state --
   const [dealAgents, setDealAgents] = useState<DealAgent[]>([]);
@@ -231,6 +239,28 @@ function EditDeal() {
     }
   }
 
+  async function handleNewClientNameBlur(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+
+    const { data, error } = await supabase
+      .from("clients")
+      .select("id, name, email, phone")
+      .ilike("name", trimmed)
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return;
+
+    setDuplicateClient({
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+    });
+    setDuplicateDialogOpen(true);
+  }
+
   async function handleAddClient(e: React.FormEvent) {
     e.preventDefault();
     if (!dealId) return;
@@ -282,6 +312,32 @@ function EditDeal() {
       );
     } finally {
       setAddingClient(false);
+    }
+  }
+  async function handleUseExistingClientOnDeal() {
+    if (!dealId || !duplicateClient) return;
+    setDuplicateDialogOpen(false);
+
+    try {
+      // Link the existing client directly -- no new clients row created
+      const { error } = await supabase.from("deal_clients").insert({
+        deal_id: dealId,
+        client_id: duplicateClient.id,
+        role: newClientRole,
+      });
+      if (error) throw error;
+
+      const refreshed = await getDealClients(dealId);
+      setDealClients(refreshed);
+      setNewClientName("");
+      setNewClientEmail("");
+      setNewClientPhone("");
+    } catch (err) {
+      setClientError(
+        err instanceof Error ? err.message : "Failed to link existing client.",
+      );
+    } finally {
+      setDuplicateClient(null);
     }
   }
 
@@ -760,6 +816,7 @@ function EditDeal() {
             placeholder="Name..."
             value={newClientName}
             onChange={(e) => setNewClientName(e.target.value)}
+            onBlur={(e) => handleNewClientNameBlur(e.target.value)}
           />
           <input
             type="email"
@@ -783,6 +840,22 @@ function EditDeal() {
           </button>
         </form>
       </section>
+      {duplicateClient && (
+        <ConfirmDialog
+          open={duplicateDialogOpen}
+          title="Client already exists"
+          message={`A client named "${duplicateClient.name}" already exists${
+            duplicateClient.email ? ` (${duplicateClient.email})` : ""
+          }. Use their existing details, or create a new record?`}
+          confirmLabel="Use existing"
+          cancelLabel="Create new"
+          onConfirm={handleUseExistingClientOnDeal}
+          onCancel={() => {
+            setDuplicateDialogOpen(false);
+            setDuplicateClient(null);
+          }}
+        />
+      )}
     </div>
   );
 }

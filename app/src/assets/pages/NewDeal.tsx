@@ -11,6 +11,9 @@ import {
 } from "../../lib/dealAgents";
 import AttorneyPicker from "../components/AttorneyPicker";
 import { isValidEmail, isValidPhone } from "../../lib/validators";
+import ConfirmDialog from "../components/ConfirmDialog";
+import type { ExistingClient } from "../../lib/useDuplicateClientCheck";
+import { supabase } from "../../lib/supabaseClient";
 
 type Representing = "seller" | "buyer" | "rental";
 type DealType = "sale" | "rental";
@@ -41,6 +44,18 @@ function NewDeal() {
   // other side, e.g. the buyer on a listing you don't also represent, gets
   // added later once they're known, via the Edit Deal page).
   const [clients, setClients] = useState<ClientRow[]>([{ ...EMPTY_CLIENT }]);
+  // Tracks existing clients found per row index.
+  // null = no duplicate found yet; ExistingClient = awaiting agent decision.
+  const [duplicateByIndex, setDuplicateByIndex] = useState<
+    Map<number, ExistingClient>
+  >(new Map());
+  const [duplicateDialogIndex, setDuplicateDialogIndex] = useState<
+    number | null
+  >(null);
+  // Tracks which rows should use an existing client id instead of inserting new clients.
+  const [existingClientIds, setExistingClientIds] = useState<
+    Map<number, string>
+  >(new Map());
 
   const [attorneyId, setAttorneyId] = useState("");
   const [bondDetails, setBondDetails] = useState("");
@@ -127,6 +142,53 @@ function NewDeal() {
     return agentDirectory.filter((a) => !chosenElsewhere.includes(a.id));
   }
 
+  function handleUseExistingClient(index: number, existing: ExistingClient) {
+    // Replace the name field with the existing client's name (so it's clear // what was selected), and store the existing id separately for submission.
+    updateClient(index, "name", existing.name);
+    updateClient(index, "email", existing.email ?? "");
+    updateClient(index, "phone", existing.phone ?? "");
+    setExistingClientIds((prev) => new Map(prev).set(index, existing.id));
+    setDuplicateByIndex((prev) => {
+      const m = new Map(prev);
+      m.delete(index);
+      return m;
+    });
+    setDuplicateDialogIndex(null);
+  }
+
+  function handleCreateNewClient(index: number) {
+    setDuplicateByIndex((prev) => {
+      const m = new Map(prev);
+      m.delete(index);
+      return m;
+    });
+    setDuplicateDialogIndex(null);
+  }
+
+  async function handleClientNameBlur(index: number, name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+
+    const { data, error } = await supabase
+      .from("clients")
+      .select("id, name, email, phone")
+      .ilike("name", trimmed)
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return;
+
+    setDuplicateByIndex((prev) =>
+      new Map(prev).set(index, {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+      }),
+    );
+    setDuplicateDialogIndex(index);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!session) return;
@@ -188,16 +250,22 @@ function NewDeal() {
     setError(null);
 
     try {
-      const clientInputs = trimmedClients.map((c) => ({
-        name: c.name,
-        email: c.email || undefined,
-        phone: c.phone || undefined,
-        type: (representing === "seller"
-          ? "seller"
-          : representing === "buyer"
-            ? "buyer"
-            : "tenant") as "seller" | "buyer" | "tenant",
-      }));
+      const clientInputs = trimmedClients.map((c, index) => {
+        const existingId = existingClientIds.get(index);
+        return {
+          ...(existingId ? { existingId } : {}),
+          name: c.name,
+          email: c.email || undefined,
+          phone: c.phone || undefined,
+          type: (representing === "seller"
+            ? "seller"
+            : representing === "buyer"
+              ? "buyer"
+              : "tenant") as "seller" | "buyer" | "tenant",
+        };
+      });
+      // NOTE: createDealWithBoard currently always creates new clients via insertClients().
+      // See deals.ts change below -- insertClients needs to handle the existingId case.
 
       const { dealId } = await createDealWithBoard({
         agentId: session.user.id,
@@ -341,6 +409,7 @@ function NewDeal() {
                 placeholder={`${clientLabel} name...`}
                 value={client.name}
                 onChange={(e) => updateClient(index, "name", e.target.value)}
+                onBlur={(e) => handleClientNameBlur(index, e.target.value)}
                 required
               />
               <input
@@ -498,6 +567,27 @@ function NewDeal() {
           {submitting ? "Creating…" : "Create Deal"}
         </button>
       </form>
+      {duplicateDialogIndex !== null &&
+        duplicateByIndex.get(duplicateDialogIndex) && (
+          <ConfirmDialog
+            open={true}
+            title="Client already exists"
+            message={`A client named "${duplicateByIndex.get(duplicateDialogIndex)?.name}" already exists${
+              duplicateByIndex.get(duplicateDialogIndex)?.email
+                ? ` (${duplicateByIndex.get(duplicateDialogIndex)?.email})`
+                : ""
+            }. Use their existing details, or create a new record?`}
+            confirmLabel="Use existing"
+            cancelLabel="Create new"
+            onConfirm={() =>
+              handleUseExistingClient(
+                duplicateDialogIndex,
+                duplicateByIndex.get(duplicateDialogIndex)!,
+              )
+            }
+            onCancel={() => handleCreateNewClient(duplicateDialogIndex)}
+          />
+        )}
     </div>
   );
 }
