@@ -61,7 +61,7 @@ function AttorneyPicker({ value, onChange }: AttorneyPickerProps) {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run on session change; `value`/`onChange` are intentionally excluded so this doesn't re-fetch on every keystroke elsewhere in the form
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
   function handleSelectChange(e: React.ChangeEvent<HTMLSelectElement>) {
@@ -70,6 +70,16 @@ function AttorneyPicker({ value, onChange }: AttorneyPickerProps) {
       return;
     }
     onChange(e.target.value);
+  }
+
+  // Prevents Enter from bubbling up to the outer deal form and submitting it.
+  // Must be on each <input> individually -- preventDefault() on a wrapping
+  // <div>'s onKeyDown does not stop the browser's native form-submit behavior.
+  function handleInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddNew();
+    }
   }
 
   async function handleAddNew() {
@@ -153,34 +163,28 @@ function AttorneyPicker({ value, onChange }: AttorneyPickerProps) {
       )}
 
       {addingNew && (
-        <div
-          className="flex flex-col gap-2 border rounded p-3"
-          //Make sure the form doesn't submit when pressing enter in the input fields
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              handleAddNew();
-            }
-          }}
-        >
+        <div className="flex flex-col gap-2 border rounded p-3">
           <span className="font-medium text-sm">Add a new attorney</span>
           <input
             type="text"
             placeholder="Name..."
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={handleInputKeyDown}
           />
           <input
             type="text"
             placeholder="Contact (email and/or phone)..."
             value={newContact}
             onChange={(e) => setNewContact(e.target.value)}
+            onKeyDown={handleInputKeyDown}
           />
           <input
             type="text"
             placeholder="Firm name..."
             value={newFirmName}
             onChange={(e) => setNewFirmName(e.target.value)}
+            onKeyDown={handleInputKeyDown}
           />
           <div className="flex gap-2">
             <button
