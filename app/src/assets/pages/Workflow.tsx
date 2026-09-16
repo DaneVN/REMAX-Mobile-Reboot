@@ -235,7 +235,7 @@ function Workflow() {
           console.log("Marking deal as completed:", dealId);
           supabase
             .from("deals")
-            .update({ status: "completed" })
+            .update({ status: "closed" })
             .eq("id", dealId)
             .then(({ error }) => {
               if (error) {
