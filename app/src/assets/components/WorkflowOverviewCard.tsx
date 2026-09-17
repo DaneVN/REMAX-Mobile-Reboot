@@ -161,7 +161,9 @@ function WorkflowOverviewCard() {
         <span className="text-sm underline">View all boards →</span>
       </div>
 
-      {loading && <p>Loading tasks...</p>}
+      {loading && (
+        <img src="/blocks-shuffle-3.svg" alt="Loading..." className="w-6 h-6" />
+      )}
 
       {!loading && error && (
         <p className="text-(--cl-accent-dark)">Couldn't load tasks: {error}</p>

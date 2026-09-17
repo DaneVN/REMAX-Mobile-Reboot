@@ -114,7 +114,13 @@ function Workflow() {
   const currentDeal = deals?.find((deal) => deal.id === dealId);
   const propertyAddress = currentDeal?.property_address || "Unknown Address";
 
-  if (loading) return <p>Loading board…</p>;
+  if (loading)
+    return (
+      <>
+        <p>Loading board…</p>{" "}
+        <img src="/blocks-shuffle-3.svg" alt="" className="w-6 h-6" />
+      </>
+    );
   if (!board) return <p>No workflow board found for this deal yet.</p>;
 
   const columns = groupTasksByColumn(board.workflow_tasks);

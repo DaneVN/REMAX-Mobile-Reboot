@@ -28,8 +28,8 @@ function ArchivedDeals() {
         if (cancelled) return;
 
         if (error) {
-          console.error("Failed to fetch archived deals:", error);
-          setError("Couldn't load archived deals.");
+          console.error("Failed to fetch archived boards:", error);
+          setError("Couldn't load archived boards.");
         }
         setDeals((data ?? []) as ArchivedDeal[]);
         setLoading(false);
@@ -47,23 +47,29 @@ function ArchivedDeals() {
       await restoreDeal(dealId);
       setDeals((prev) => prev.filter((d) => d.id !== dealId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to restore deal.");
+      setError(err instanceof Error ? err.message : "Failed to restore board.");
     } finally {
       setRestoringId(null);
     }
   }
 
-  if (loading) return <p className="p-4">Loading archived deals…</p>;
+  if (loading)
+    return (
+      <>
+        <p className="p-4">Loading archived boards...</p>
+        <img src="/blocks-shuffle-3.svg" alt="Loading..." className="w-6 h-6" />
+      </>
+    );
 
   return (
     <div className="flex flex-col gap-3 p-4">
-      <h1>Archived Deals</h1>
+      <h1>Archived Boards</h1>
       <Link to="/workflow" className="self-start underline">
-        &larr; Back to active deals
+        &larr; Back to active files
       </Link>
 
       {error && <p className="text-red-700">{error}</p>}
-      {deals.length === 0 && <p>No archived deals.</p>}
+      {deals.length === 0 && <p>No archived boards.</p>}
 
       {deals.map((deal) => (
         <div

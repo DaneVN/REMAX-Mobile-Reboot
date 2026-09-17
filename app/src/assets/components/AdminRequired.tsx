@@ -31,9 +31,15 @@ function AdminRequired() {
     };
   }, [session]);
 
-  if (authLoading) return null; // or a spinner
+  if (authLoading)
+    return (
+      <img src="/blocks-shuffle-3.svg" alt="Loading..." className="w-6 h-6" />
+    );
   if (!session) return <Navigate to="/login" replace />;
-  if (roleLoading) return null; // or a spinner
+  if (roleLoading)
+    return (
+      <img src="/blocks-shuffle-3.svg" alt="Loading..." className="w-6 h-6" />
+    );
   if (role !== "admin") return <Navigate to="/" replace />;
 
   return <Outlet />;

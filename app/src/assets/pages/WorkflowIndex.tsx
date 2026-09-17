@@ -118,7 +118,13 @@ function WorkflowIndex() {
   //   }
   // }
 
-  if (loading) return <p>Loading deals…</p>;
+  if (loading)
+    return (
+      <>
+        <p>Loading boards</p>{" "}
+        <img src="/blocks-shuffle-3.svg" alt="Loading..." className="w-6 h-6" />
+      </>
+    );
 
   return (
     <div className="flex flex-col gap-3 p-4">

@@ -33,8 +33,8 @@ function DealProgressCard() {
       })
       .catch((err) => {
         if (cancelled) return;
-        console.error("Failed to load deal progress:", err);
-        setError("Couldn't load your deals right now.");
+        console.error("Failed to load board progress:", err);
+        setError("Couldn't load your boards right now.");
         setLoading(false);
       });
 
@@ -45,9 +45,18 @@ function DealProgressCard() {
 
   return (
     <div className="bg-(--cl-base) text-(--cl-dark-blue) p-4 rounded shadow-md w-full max-w-2xl">
-      <h2>Deal Progress</h2>
+      <h2>Progress</h2>
 
-      {loading && <p>Loading your deals…</p>}
+      {loading && (
+        <>
+          <p>Loading your boards...</p>
+          <img
+            src="/blocks-shuffle-3.svg"
+            alt="Loading..."
+            className="w-6 h-6"
+          />
+        </>
+      )}
       {error && <p className="text-red-700">{error}</p>}
 
       {!loading && !error && deals.length === 0 && <p>No active deals yet.</p>}

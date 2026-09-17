@@ -124,7 +124,10 @@ function AttorneyPicker({ value, onChange }: AttorneyPickerProps) {
 
   const selected = attorneys.find((a) => a.id === value);
 
-  if (loading) return <p className="text-sm">Loading attorneys…</p>;
+  if (loading)
+    return (
+      <img src="/blocks-shuffle-3.svg" alt="Loading..." className="w-6 h-6" />
+    );
 
   return (
     <div className="flex flex-col gap-2">

@@ -233,7 +233,7 @@ function EditDeal() {
       setError(
         err instanceof Error
           ? err.message
-          : "Something went wrong updating the deal.",
+          : "Something went wrong updating the board.",
       );
       setSubmitting(false);
     }
@@ -477,7 +477,10 @@ function EditDeal() {
     }
   }
 
-  if (loading) return <p className="p-4">Loading deal…</p>;
+  if (loading)
+    return (
+      <img src="/blocks-shuffle-3.svg" alt="Loading..." className="w-6 h-6" />
+    );
 
   if (notFound) {
     return (
@@ -618,7 +621,13 @@ function EditDeal() {
         </p>
 
         {agentError && <p className="text-red-600">{agentError}</p>}
-        {agentsLoading && <p>Loading agents…</p>}
+        {agentsLoading && (
+          <img
+            src="/blocks-shuffle-3.svg"
+            alt="Loading agents..."
+            className="w-6 h-6"
+          />
+        )}
 
         {!agentsLoading && (
           <>
@@ -728,7 +737,13 @@ function EditDeal() {
         <h2>Clients on this deal</h2>
 
         {clientError && <p className="text-red-600">{clientError}</p>}
-        {clientsLoading && <p>Loading clients…</p>}
+        {clientsLoading && (
+          <img
+            src="/blocks-shuffle-3.svg"
+            alt="Loading clients..."
+            className="w-6 h-6"
+          />
+        )}
 
         {!clientsLoading && (
           <>

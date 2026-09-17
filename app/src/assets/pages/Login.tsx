@@ -125,7 +125,15 @@ function Login() {
               disabled={loading}
               className="w-full bg-(--cl-accent) hover:bg-(--cl-accent-dark) text-(--cl-white) font-semibold py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
             >
-              {loading ? "Signing in..." : "Sign In"}
+              {loading ? (
+                <img
+                  src="/blocks-shuffle-3.svg"
+                  alt="Loading..."
+                  className="w-6 h-6"
+                />
+              ) : (
+                "Sign In"
+              )}
             </button>
           </form>
 
