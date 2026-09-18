@@ -103,3 +103,54 @@ export async function countFollowingShiftableTasks(
   if (error) throw error;
   return count ?? 0;
 }
+
+export async function insertCustomTask(
+  boardId: string,
+  title: string,
+  description: string | null,
+  dueDate: string | null,
+  stage: number,
+  afterSortOrder: number | null,
+): Promise<WorkflowTask> {
+  const { data, error } = await supabase.rpc("insert_custom_task", {
+    p_board_id: boardId,
+    p_title: title,
+    p_description: description ?? "",
+    p_due_date: dueDate ?? "",
+    p_stage: stage,
+    p_after_sort_order: afterSortOrder ?? undefined,
+  });
+
+  if (error) throw error;
+
+  const result = data?.[0];
+  if (!result) throw new Error("Custom task insertion failed.");
+
+  // Fetch the full task to return
+  const { data: taskData, error: taskError } = await supabase
+    .from("workflow_tasks")
+    .select(
+      "id, board_id, title, description, column, due_date, template_source_id, sort_order, stage, created_at",
+    )
+    .eq("id", result.task_id)
+    .single();
+
+  if (taskError) throw taskError;
+  return taskData as WorkflowTask;
+}
+
+// Helper: fetch tasks for a board with context (for the picker UI)
+export async function getTasksForPositioning(
+  boardId: string,
+): Promise<WorkflowTask[]> {
+  const { data, error } = await supabase
+    .from("workflow_tasks")
+    .select(
+      "id, board_id, title, description, column, due_date, template_source_id, sort_order, stage, created_at",
+    )
+    .eq("board_id", boardId)
+    .order("sort_order", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as WorkflowTask[];
+}

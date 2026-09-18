@@ -10,6 +10,7 @@ import { supabase } from "../../lib/supabaseClient";
 import TaskEditModal from "../components/TaskEditModal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { useNavigate } from "react-router-dom";
+import AddTaskModal from "../components/AddTaskModal";
 
 function Workflow() {
   const { dealId } = useParams<{ dealId: string }>();
@@ -29,6 +30,8 @@ function Workflow() {
   const [expandedColumns, setExpandedColumns] = useState<
     Record<WorkflowTask["column"], boolean>
   >({ todo: false, doing: false, done: false });
+
+  const [addTaskOpen, setAddTaskOpen] = useState(false);
 
   const today = new Date();
 
@@ -125,6 +128,19 @@ function Workflow() {
 
   const columns = groupTasksByColumn(board.workflow_tasks);
 
+  function handleTaskAdded(newTask: WorkflowTask) {
+    // Add to the board's task list
+    setBoard((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        workflow_tasks: [...current.workflow_tasks, newTask].sort(
+          (a, b) => a.sort_order - b.sort_order,
+        ),
+      };
+    });
+  }
+
   return (
     <>
       <div className="flex flex-col gap-4 p-4">
@@ -149,6 +165,24 @@ function Workflow() {
           >
             Edit Deal
           </button>
+          {/* Add task button in footer */}
+          <button
+            onClick={() => setAddTaskOpen(true)}
+            className="bg-(--cl-base-dark) text-(--cl-white) px-4 py-2 rounded"
+          >
+            + Add Custom Task
+          </button>
+
+          <AddTaskModal
+            boardId={board?.id || ""}
+            open={addTaskOpen}
+            onClose={() => setAddTaskOpen(false)}
+            onTaskAdded={handleTaskAdded}
+            onSiblingShifted={() => {
+              // if task edit is saved, reload page
+              window.location.reload();
+            }}
+          />
         </div>
         {/* Column Headers */}
         <div className="sm:flex gap-4">
@@ -223,6 +257,7 @@ function Workflow() {
           />
         )}
       </div>
+
       <ConfirmDialog
         open={confirmDialogOpen}
         title="All tasks completed"
