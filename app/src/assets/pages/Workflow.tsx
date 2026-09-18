@@ -70,8 +70,6 @@ function Workflow() {
           console.error("Failed to fetch deals:", error);
         }
         setDeals(data ?? []);
-        console.log("Fetched deals:", data);
-        console.log("Current dealId:", dealId);
         setLoading(false);
       });
 
@@ -86,18 +84,13 @@ function Workflow() {
    */
   function handleTaskSaved(updatedTask: WorkflowTask) {
     //check if this task is the last task to be completed in the board, and if so, ask the user useing ConfirmDialog if they want to mark the deal as completed
-    console.log("Checking if all tasks are done for board:", board);
 
     if (updatedTask.column === "done") {
       const allTasksDone = board?.workflow_tasks.every(
         (task) => task.column === "done" || task.id === updatedTask.id,
       );
-      console.log("All tasks done check:", allTasksDone);
       if (allTasksDone) {
         // Ask user if they want to mark the deal as completed
-        console.log(
-          "All tasks completed. Prompting user to mark deal as completed.",
-        );
         setConfirmDialogOpen(true);
       }
     }
@@ -275,7 +268,6 @@ function Workflow() {
             return;
           }
 
-          console.log("Marking deal as completed:", dealId);
           supabase
             .from("deals")
             .update({ status: "closed" })
@@ -292,7 +284,6 @@ function Workflow() {
         }}
         onCancel={() => {
           // cancel the rest of the operation and just close the dialog
-          console.log("User canceled marking deal as completed.");
           setConfirmDialogOpen(false);
           return;
         }}
