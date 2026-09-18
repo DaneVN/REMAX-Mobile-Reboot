@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { supabase } from "../../lib/supabaseClient"; // adjust to your actual client path
-import type { WorkflowTask } from "../../lib/workflow"; // adjust to your actual types path
+import { supabase } from "../../lib/supabaseClient";
+import type { WorkflowTask } from "../../lib/workflow";
 import {
   countFollowingShiftableTasks,
   shiftFollowingTaskDueDates,
+  deleteTask,
 } from "../../lib/workflow";
-import ConfirmDialog from "./ConfirmDialog"; // adjust if not a sibling file
+import ConfirmDialog from "./ConfirmDialog";
 
 interface TaskEditModalProps {
   task: WorkflowTask;
-  boardId: string; // needed to scope the "shift following tasks" query/update to this board
+  boardId: string;
   onClose: () => void;
+  onDeleted: (taskId: string) => void;
   onSaved: (updatedTask: WorkflowTask) => void;
   // Called after a cascading shift succeeds, so the parent can refetch the
   // whole board -- the edited task's siblings changed in the database but
@@ -39,6 +41,7 @@ function TaskEditModal({
   boardId,
   onClose,
   onSaved,
+  onDeleted,
   onSiblingsShifted,
 }: TaskEditModalProps) {
   const [title, setTitle] = useState(task.title);
@@ -46,6 +49,7 @@ function TaskEditModal({
   const [dueDate, setDueDate] = useState(task.due_date ?? "");
   const [description, setDescription] = useState(task.description ?? "");
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Cascading-shift confirmation state
@@ -56,6 +60,9 @@ function TaskEditModal({
   } | null>(null);
   const [shifting, setShifting] = useState(false);
 
+  // Delete confirmation state
+  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
+
   // Lock background scroll while the modal (or its confirmation) is open
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
@@ -65,15 +72,15 @@ function TaskEditModal({
     };
   }, []);
 
-  // Allow Escape to close, same as clicking the cross -- but not while the
+  // Allow Escape to close, same as clicking the cross — but not while the
   // shift confirmation is open, since ConfirmDialog handles its own Escape.
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && !pendingShift) onClose();
+      if (e.key === "Escape" && !pendingShift && !deletingTaskId) onClose();
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, pendingShift]);
+  }, [onClose, pendingShift, deletingTaskId]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -93,7 +100,7 @@ function TaskEditModal({
       })
       .eq("id", task.id)
       .select(
-        "id, board_id, title, column, due_date, template_source_id, sort_order, created_at, description",
+        "id, board_id, title, column, due_date, template_source_id, sort_order, created_at, description, stage",
       )
       .single();
 
@@ -106,9 +113,6 @@ function TaskEditModal({
 
     const savedTask = data as WorkflowTask;
 
-    // Only worth considering a cascade if the due date actually changed,
-    // and both the old and new values are real dates (not cleared/blank --
-    // there's no sensible "shift amount" if either end is missing).
     const dueDateChanged =
       originalDueDate !== null &&
       newDueDate !== null &&
@@ -130,18 +134,18 @@ function TaskEditModal({
 
       if (affectedCount === 0) {
         // Nothing downstream to shift (e.g. this is the last task, or
-        // everything after it is already done) -- just save and close.
+        // everything after it is already done) - just save and close.
         onSaved(savedTask);
         onClose();
         return;
       }
 
-      // Hold the modal open behind the confirmation -- the task itself is
+      // Hold the modal open behind the confirmation - the task itself is
       // already saved at this point either way; this step only decides
       // whether the *following* tasks move too.
       setPendingShift({ deltaDays, affectedCount, savedTask });
     } catch (err) {
-      // If the count check itself fails, don't block on the cascade --
+      // If the count check itself fails, don't block on the cascade -
       // the primary task edit already succeeded, so still close normally.
       console.error("Failed to check for shiftable following tasks:", err);
       onSaved(savedTask);
@@ -180,6 +184,23 @@ function TaskEditModal({
     onSaved(pendingShift.savedTask);
     setPendingShift(null);
     onClose();
+  }
+
+  async function handleConfirmDelete() {
+    setDeleting(true);
+    setError(null);
+
+    try {
+      await deleteTask(task.id);
+      onDeleted?.(task.id);
+      setDeletingTaskId(null);
+      onClose();
+      onSiblingsShifted?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete task.");
+      setDeleting(false);
+      setDeletingTaskId(null);
+    }
   }
 
   const shiftDirection =
@@ -264,21 +285,30 @@ function TaskEditModal({
               <p className="text-(--cl-accent-dark) text-sm">{error}</p>
             )}
 
-            <div className="flex justify-end gap-2 mt-2">
+            <div className="flex justify-between gap-2 mt-2">
               <button
                 type="button"
-                onClick={onClose}
-                className="px-4 py-2 rounded border border-(--cl-base) hover:bg-(--cl-base) hover:text-(--cl-white) transition-colors"
+                onClick={() => setDeletingTaskId(task.id)}
+                className="px-4 py-2 rounded border-2 border-(--cl-accent) text-(--cl-accent) hover:bg-(--cl-accent) hover:text-(--cl-white) transition-colors"
               >
-                Cancel
+                Delete
               </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="px-4 py-2 rounded bg-(--cl-accent-dark) text-(--cl-white) hover:opacity-90 transition-opacity disabled:opacity-50"
-              >
-                {saving ? "Saving..." : "Save changes"}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 rounded border border-(--cl-base) hover:bg-(--cl-base) hover:text-(--cl-white) transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-4 py-2 rounded bg-(--cl-accent-dark) text-(--cl-white) hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {saving ? "Saving..." : "Save changes"}
+                </button>
+              </div>
             </div>
           </form>
         </div>
@@ -298,6 +328,17 @@ function TaskEditModal({
         cancelLabel="Just this task"
         onConfirm={handleConfirmShift}
         onCancel={handleDeclineShift}
+      />
+
+      <ConfirmDialog
+        open={deletingTaskId !== null}
+        title="Delete this task?"
+        message="This action cannot be undone. The task will be permanently removed from the workflow board."
+        confirmLabel={deleting ? "Deleting…" : "Delete"}
+        cancelLabel="Cancel"
+        destructive
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeletingTaskId(null)}
       />
     </>
   );

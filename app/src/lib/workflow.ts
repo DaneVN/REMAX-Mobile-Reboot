@@ -154,3 +154,12 @@ export async function getTasksForPositioning(
   if (error) throw error;
   return (data ?? []) as WorkflowTask[];
 }
+
+export async function deleteTask(taskId: string): Promise<void> {
+  const { error } = await supabase
+    .from("workflow_tasks")
+    .delete()
+    .eq("id", taskId);
+
+  if (error) throw error;
+}
