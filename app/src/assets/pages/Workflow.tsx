@@ -11,6 +11,7 @@ import TaskEditModal from "../components/TaskEditModal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { useNavigate } from "react-router-dom";
 import AddTaskModal from "../components/AddTaskModal";
+import { deleteTask } from "../../lib/workflow";
 
 function Workflow() {
   const { dealId } = useParams<{ dealId: string }>();
@@ -251,6 +252,7 @@ function Workflow() {
               // if task edit is saved, reload page
               window.location.reload();
             }}
+            onDeleted={deleteTask}
             onSaved={(updatedTask) => {
               handleTaskSaved(updatedTask);
             }}
