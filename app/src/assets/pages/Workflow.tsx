@@ -277,10 +277,8 @@ function Workflow() {
                 console.error("Failed to mark deal as completed:", error);
               }
               setConfirmDialogOpen(false);
+              navigate("/workflow");
             });
-          {
-            /** RUNTIME ERROR: new row for relation \"deals\" violates check constraint \"deals_status_check\" */
-          }
         }}
         onCancel={() => {
           // cancel the rest of the operation and just close the dialog

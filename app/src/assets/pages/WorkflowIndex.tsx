@@ -101,23 +101,6 @@ function WorkflowIndex() {
     }
   }
 
-  // async function handleDeletePermanentlyConfirmed() {
-  //   if (!pendingDeleteId) return;
-  //   setActionError(null);
-  //   try {
-  //     await deleteDealPermanently(pendingDeleteId);
-  //     setDeals((prev) => prev.filter((d) => d.id !== pendingDeleteId));
-  //   } catch (err) {
-  //     setActionError(
-  //       err instanceof Error
-  //         ? err.message
-  //         : "Failed to permanently delete deal.",
-  //     );
-  //   } finally {
-  //     setPendingDeleteId(null);
-  //   }
-  // }
-
   if (loading)
     return (
       <>
