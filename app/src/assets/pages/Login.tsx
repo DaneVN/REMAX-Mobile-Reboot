@@ -5,13 +5,25 @@ import { supabase } from "../../lib/supabaseClient";
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+
+    const newErrors: string[] = [];
+    if (!email.trim()) newErrors.push("Email address is required.");
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+      newErrors.push("Enter a valid email address.");
+    if (!password) newErrors.push("Password is required.");
+
+    if (newErrors.length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setErrors([]);
     setLoading(true);
 
     const { error } = await supabase.auth.signInWithPassword({
@@ -22,7 +34,7 @@ function Login() {
     setLoading(false);
 
     if (error) {
-      setError(error.message);
+      setErrors([error.message]);
       return;
     }
 
@@ -46,7 +58,11 @@ function Login() {
             Sign In
           </h2>
 
-          <form onSubmit={handleLogin} className="flex flex-col gap-4">
+          <form
+            onSubmit={handleLogin}
+            noValidate
+            className="flex flex-col gap-4"
+          >
             {/* Email Input */}
             <div className="flex flex-col gap-2">
               <label
@@ -61,7 +77,6 @@ function Login() {
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required
                 className="px-4 py-2 border border-(--cl-base) rounded-lg focus:outline-none focus:ring-2 focus:ring-(--cl-accent) focus:border-transparent transition-all"
               />
             </div>
@@ -76,14 +91,12 @@ function Login() {
               </label>
               <div className="flex items-center gap-2">
                 <input
-                  //toggle the hidden chacracters if the user clicks on the eye icon
                   id="password"
                   type="password"
                   autoComplete="current-password"
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  required
                   className="px-4 py-2 w-full border border-(--cl-base) rounded-lg focus:outline-none focus:ring-2 focus:ring-(--cl-accent) focus:border-transparent transition-all"
                 />
                 <button
@@ -112,10 +125,12 @@ function Login() {
               </div>
             </div>
 
-            {/* Error Message */}
-            {error && (
-              <div className="bg-(--cl-accent)/10 border border-(--cl-accent) text-(--cl-accent-dark) px-4 py-3 rounded-lg text-sm">
-                {error}
+            {/* Error block — all errors shown together just above the button */}
+            {errors.length > 0 && (
+              <div className="bg-(--cl-accent)/10 border border-(--cl-accent) text-(--cl-accent-dark) px-4 py-3 rounded-lg text-sm flex flex-col gap-1">
+                {errors.map((err) => (
+                  <p key={err}>• {err}</p>
+                ))}
               </div>
             )}
 
@@ -129,7 +144,7 @@ function Login() {
                 <img
                   src="/blocks-shuffle-3.svg"
                   alt="Loading..."
-                  className="w-6 h-6"
+                  className="w-6 h-6 mx-auto"
                 />
               ) : (
                 "Sign In"

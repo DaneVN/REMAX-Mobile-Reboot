@@ -48,7 +48,7 @@ function EditDeal() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [dealErrors, setDealErrors] = useState<string[]>([]);
 
   const [propertyAddress, setPropertyAddress] = useState("");
   const [dealType, setDealType] = useState<DealType>("sale");
@@ -64,7 +64,7 @@ function EditDeal() {
   // -- Client management state --
   const [dealClients, setDealClients] = useState<DealClient[]>([]);
   const [clientsLoading, setClientsLoading] = useState(true);
-  const [clientError, setClientError] = useState<string | null>(null);
+  const [clientErrors, setClientErrors] = useState<string[]>([]);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   const [newClientRole, setNewClientRole] = useState<ClientRole>("seller");
@@ -83,7 +83,7 @@ function EditDeal() {
   // -- Agent management state --
   const [dealAgents, setDealAgents] = useState<DealAgent[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(true);
-  const [agentError, setAgentError] = useState<string | null>(null);
+  const [agentErrors, setAgentErrors] = useState<string[]>([]);
   const [removingAgentId, setRemovingAgentId] = useState<string | null>(null);
   const [savingSplitId, setSavingSplitId] = useState<string | null>(null);
   const [splitDrafts, setSplitDrafts] = useState<Record<string, string>>({});
@@ -147,7 +147,7 @@ function EditDeal() {
       .catch((err) => {
         if (cancelled) return;
         console.error("Failed to load deal clients:", err);
-        setClientError("Couldn't load clients for this deal.");
+        setClientErrors(["Couldn't load clients for this deal."]);
         setClientsLoading(false);
       });
 
@@ -177,7 +177,7 @@ function EditDeal() {
       .catch((err) => {
         if (cancelled) return;
         console.error("Failed to load deal agents:", err);
-        setAgentError("Couldn't load agents for this deal.");
+        setAgentErrors(["Couldn't load agents for this deal."]);
         setAgentsLoading(false);
       });
 
@@ -207,8 +207,23 @@ function EditDeal() {
     e.preventDefault();
     if (!dealId) return;
 
+    const newErrors: string[] = [];
+    if (!propertyAddress.trim())
+      newErrors.push("Property address is required.");
+
+    if (parseFloat(listingPrice) < 0)
+      newErrors.push("You listing price can't be a negative number");
+
+    if (parseFloat(purchasePrice) < 0)
+      newErrors.push("You purchase price can't be a negative number");
+
+    if (newErrors.length > 0) {
+      setDealErrors(newErrors);
+      return;
+    }
+
     setSubmitting(true);
-    setError(null);
+    setDealErrors([]);
 
     try {
       await updateDeal(dealId, {
@@ -230,11 +245,11 @@ function EditDeal() {
 
       navigate(`/workflow/${dealId}`);
     } catch (err) {
-      setError(
+      setDealErrors([
         err instanceof Error
           ? err.message
           : "Something went wrong updating the board.",
-      );
+      ]);
       setSubmitting(false);
     }
   }
@@ -265,24 +280,23 @@ function EditDeal() {
     e.preventDefault();
     if (!dealId) return;
 
+    const newErrors: string[] = [];
     const trimmedName = newClientName.trim();
     const trimmedEmail = newClientEmail.trim();
     const trimmedPhone = newClientPhone.trim();
 
-    if (!trimmedName) {
-      setClientError("Client name is required.");
-      return;
-    }
-    if (trimmedPhone && !isValidPhone(trimmedPhone)) {
-      setClientError("Please enter a valid 10-digit phone number.");
-      return;
-    }
-    if (trimmedEmail && !isValidEmail(trimmedEmail)) {
-      setClientError("Please enter a valid email address.");
+    if (!trimmedName) newErrors.push("Client name is required.");
+    if (trimmedPhone && !isValidPhone(trimmedPhone))
+      newErrors.push("Phone number is invalid — enter 10 digits.");
+    if (trimmedEmail && !isValidEmail(trimmedEmail))
+      newErrors.push("Email address is invalid.");
+
+    if (newErrors.length > 0) {
+      setClientErrors(newErrors);
       return;
     }
 
-    setClientError(null);
+    setClientErrors([]);
     setAddingClient(true);
 
     try {
@@ -307,19 +321,19 @@ function EditDeal() {
       setNewClientEmail("");
       setNewClientPhone("");
     } catch (err) {
-      setClientError(
+      setClientErrors([
         err instanceof Error ? err.message : "Failed to add client.",
-      );
+      ]);
     } finally {
       setAddingClient(false);
     }
   }
+
   async function handleUseExistingClientOnDeal() {
     if (!dealId || !duplicateClient) return;
     setDuplicateDialogOpen(false);
 
     try {
-      // Link the existing client directly -- no new clients row created
       const { error } = await supabase.from("deal_clients").insert({
         deal_id: dealId,
         client_id: duplicateClient.id,
@@ -333,20 +347,20 @@ function EditDeal() {
       setNewClientEmail("");
       setNewClientPhone("");
     } catch (err) {
-      setClientError(
+      setClientErrors([
         err instanceof Error ? err.message : "Failed to link existing client.",
-      );
+      ]);
     } finally {
       setDuplicateClient(null);
     }
   }
 
   async function handleRemoveClient(dealClientRowId: string) {
-    setClientError(null);
+    setClientErrors([]);
     setRemovingId(dealClientRowId);
 
     if (dealClients.length <= 1) {
-      setClientError("Your deal must have at least one client.");
+      setClientErrors(["Your deal must have at least one client."]);
       setRemovingId(null);
       return;
     }
@@ -355,17 +369,14 @@ function EditDeal() {
       await removeClientFromDeal(dealClientRowId);
       setDealClients((prev) => prev.filter((c) => c.id !== dealClientRowId));
     } catch (err) {
-      setClientError(
+      setClientErrors([
         err instanceof Error ? err.message : "Failed to remove client.",
-      );
+      ]);
     } finally {
       setRemovingId(null);
     }
   }
 
-  // Agents already on this deal are excluded from the "add" picker --
-  // deal_agents has a unique(deal_id, agent_id) constraint, so re-adding
-  // one would fail anyway; filtering here just avoids offering it at all.
   const availableAgents = agentDirectory.filter(
     (a) => !dealAgents.some((da) => da.agentId === a.id),
   );
@@ -379,15 +390,20 @@ function EditDeal() {
 
   async function handleAddAgent(e: React.FormEvent) {
     e.preventDefault();
-    if (!dealId || !newAgentId) return;
+    if (!dealId) return;
 
+    const newErrors: string[] = [];
+    if (!newAgentId) newErrors.push("Select an agent to add.");
     const splitValue = parseFloat(newAgentSplit);
-    if (Number.isNaN(splitValue) || splitValue < 0 || splitValue > 100) {
-      setAgentError("Enter a commission split between 0 and 100.");
+    if (Number.isNaN(splitValue) || splitValue < 0 || splitValue > 100)
+      newErrors.push("Enter a commission split between 0 and 100.");
+
+    if (newErrors.length > 0) {
+      setAgentErrors(newErrors);
       return;
     }
 
-    setAgentError(null);
+    setAgentErrors([]);
     setAddingAgent(true);
 
     try {
@@ -405,9 +421,9 @@ function EditDeal() {
       setNewAgentId("");
       setNewAgentSplit("");
     } catch (err) {
-      setAgentError(
+      setAgentErrors([
         err instanceof Error ? err.message : "Failed to add agent.",
-      );
+      ]);
     } finally {
       setAddingAgent(false);
     }
@@ -415,19 +431,19 @@ function EditDeal() {
 
   function handleSplitChange(dealAgentRowId: string, value: string) {
     setSplitDrafts((prev) => ({ ...prev, [dealAgentRowId]: value }));
-    setAgentError(null);
+    setAgentErrors([]);
   }
 
   async function handleUpdateSplit(dealAgentRowId: string) {
     const value = splitDrafts[dealAgentRowId] ?? "";
     const splitValue = parseFloat(value);
     if (Number.isNaN(splitValue) || splitValue < 0 || splitValue > 100) {
-      setAgentError("Enter a commission split between 0 and 100.");
+      setAgentErrors(["Enter a commission split between 0 and 100."]);
       return;
     }
 
     setSavingSplitId(dealAgentRowId);
-    setAgentError(null);
+    setAgentErrors([]);
 
     try {
       await updateAgentSplit(dealAgentRowId, splitValue);
@@ -439,9 +455,9 @@ function EditDeal() {
         ),
       );
     } catch (err) {
-      setAgentError(
+      setAgentErrors([
         err instanceof Error ? err.message : "Failed to update split.",
-      );
+      ]);
       if (dealId) {
         const refreshed = await getDealAgents(dealId);
         setDealAgents(refreshed);
@@ -452,13 +468,12 @@ function EditDeal() {
   }
 
   async function handleRemoveAgent(dealAgentRowId: string) {
-    setAgentError(null);
-
     if (dealAgents.length <= 1) {
-      setAgentError("A deal must have at least one assigned agent.");
+      setAgentErrors(["A deal must have at least one assigned agent."]);
       return;
     }
 
+    setAgentErrors([]);
     setRemovingAgentId(dealAgentRowId);
     try {
       await removeAgentFromDeal(dealAgentRowId);
@@ -469,9 +484,9 @@ function EditDeal() {
         return next;
       });
     } catch (err) {
-      setAgentError(
+      setAgentErrors([
         err instanceof Error ? err.message : "Failed to remove agent.",
-      );
+      ]);
     } finally {
       setRemovingAgentId(null);
     }
@@ -496,7 +511,7 @@ function EditDeal() {
   return (
     <div className="p-4 max-w-2xl mx-auto">
       <h1>Edit Deal</h1>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
         <fieldset className="flex flex-col gap-2">
           <legend className="font-medium">Property</legend>
           <input
@@ -504,7 +519,6 @@ function EditDeal() {
             placeholder="Property address..."
             value={propertyAddress}
             onChange={(e) => setPropertyAddress(e.target.value)}
-            required
           />
 
           <label className="flex gap-1 justify-between items-center">
@@ -599,7 +613,14 @@ function EditDeal() {
           </label>
         </fieldset>
 
-        {error && <p className="text-red-600">{error}</p>}
+        {/* Error block — all errors shown together just above submit */}
+        {dealErrors.length > 0 && (
+          <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-lg text-sm flex flex-col gap-1">
+            {dealErrors.map((err) => (
+              <p key={err}>• {err}</p>
+            ))}
+          </div>
+        )}
 
         <button
           type="submit"
@@ -612,6 +633,7 @@ function EditDeal() {
 
       <hr className="my-6" />
 
+      {/* ── Agents section ── */}
       <section className="flex flex-col gap-4">
         <h2>Agents on this deal</h2>
         <p className="text-sm text-(--cl-dark-blue)/70">
@@ -620,7 +642,6 @@ function EditDeal() {
           office-vs-external-agent split.
         </p>
 
-        {agentError && <p className="text-red-600">{agentError}</p>}
         {agentsLoading && (
           <img
             src="/blocks-shuffle-3.svg"
@@ -685,6 +706,7 @@ function EditDeal() {
 
         <form
           onSubmit={handleAddAgent}
+          noValidate
           className="flex flex-col gap-2 border rounded p-3"
         >
           <span className="font-medium text-sm">Add an agent</span>
@@ -694,7 +716,6 @@ function EditDeal() {
             <select
               value={newAgentId}
               onChange={(e) => setNewAgentId(e.target.value)}
-              required
             >
               <option value="" disabled>
                 Select a colleague…
@@ -717,9 +738,17 @@ function EditDeal() {
               value={newAgentSplit}
               disabled={!newAgentId}
               onChange={(e) => setNewAgentSplit(e.target.value)}
-              required
             />
           </label>
+
+          {/* Agent error block just above Add agent button */}
+          {agentErrors.length > 0 && (
+            <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-lg text-sm flex flex-col gap-1">
+              {agentErrors.map((err) => (
+                <p key={err}>• {err}</p>
+              ))}
+            </div>
+          )}
 
           <button
             type="submit"
@@ -733,10 +762,10 @@ function EditDeal() {
 
       <hr className="my-6" />
 
+      {/* ── Clients section ── */}
       <section className="flex flex-col gap-4">
         <h2>Clients on this deal</h2>
 
-        {clientError && <p className="text-red-600">{clientError}</p>}
         {clientsLoading && (
           <img
             src="/blocks-shuffle-3.svg"
@@ -809,6 +838,7 @@ function EditDeal() {
 
         <form
           onSubmit={handleAddClient}
+          noValidate
           className="flex flex-col gap-2 border rounded p-3"
         >
           <span className="font-medium text-sm">Add a client</span>
@@ -846,6 +876,15 @@ function EditDeal() {
             onChange={(e) => setNewClientPhone(e.target.value)}
           />
 
+          {/* Client error block just above Add client button */}
+          {clientErrors.length > 0 && (
+            <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-lg text-sm flex flex-col gap-1">
+              {clientErrors.map((err) => (
+                <p key={err}>• {err}</p>
+              ))}
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={addingClient}
@@ -855,6 +894,7 @@ function EditDeal() {
           </button>
         </form>
       </section>
+
       {duplicateClient && (
         <ConfirmDialog
           open={duplicateDialogOpen}

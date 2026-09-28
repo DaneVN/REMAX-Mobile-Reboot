@@ -39,20 +39,13 @@ function NewDeal() {
   const [dealType, setDealType] = useState<DealType>("sale");
   const [representing, setRepresenting] = useState<Representing>("seller");
 
-  // One dynamic list of clients for whichever side is being represented --
-  // a deal only ever collects clients for ONE side through this form (the
-  // other side, e.g. the buyer on a listing you don't also represent, gets
-  // added later once they're known, via the Edit Deal page).
   const [clients, setClients] = useState<ClientRow[]>([{ ...EMPTY_CLIENT }]);
-  // Tracks existing clients found per row index.
-  // null = no duplicate found yet; ExistingClient = awaiting agent decision.
   const [duplicateByIndex, setDuplicateByIndex] = useState<
     Map<number, ExistingClient>
   >(new Map());
   const [duplicateDialogIndex, setDuplicateDialogIndex] = useState<
     number | null
   >(null);
-  // Tracks which rows should use an existing client id instead of inserting new clients.
   const [existingClientIds, setExistingClientIds] = useState<
     Map<number, string>
   >(new Map());
@@ -66,11 +59,6 @@ function NewDeal() {
   const [commissionSplitPct, setCommissionSplitPct] = useState("");
   const [expectedCloseDate, setExpectedCloseDate] = useState("");
 
-  // -- Co-agent assignment (optional) --
-  // The creating agent is always added server-side at 100% by
-  // create_deal_with_board. If co-agents are added here, "mySplitPct" lets
-  // the creator adjust their own share down from that default so the total
-  // still makes sense.
   const [agentDirectory, setAgentDirectory] = useState<AgentDirectoryEntry[]>(
     [],
   );
@@ -78,14 +66,13 @@ function NewDeal() {
   const [coAgents, setCoAgents] = useState<CoAgentRow[]>([]);
 
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     listAllAgents()
       .then((data) => {
         if (cancelled) return;
-        // Exclude yourself -- you're always on the deal automatically.
         setAgentDirectory(data.filter((a) => a.id !== session?.user.id));
       })
       .catch((err) => console.error("Failed to load agent directory:", err));
@@ -133,8 +120,6 @@ function NewDeal() {
     setCoAgents((prev) => prev.filter((_, i) => i !== index));
   }
 
-  // Agents already picked in another row are excluded from the remaining
-  // dropdowns, so the same colleague can't be added twice.
   function availableAgentsFor(currentIndex: number) {
     const chosenElsewhere = coAgents
       .filter((_, i) => i !== currentIndex)
@@ -143,7 +128,6 @@ function NewDeal() {
   }
 
   function handleUseExistingClient(index: number, existing: ExistingClient) {
-    // Replace the name field with the existing client's name (so it's clear // what was selected), and store the existing id separately for submission.
     updateClient(index, "name", existing.name);
     updateClient(index, "email", existing.email ?? "");
     updateClient(index, "phone", existing.phone ?? "");
@@ -193,11 +177,11 @@ function NewDeal() {
     e.preventDefault();
     if (!session) return;
 
+    const newErrors: string[] = [];
+
     const trimmedAddress = propertyAddress.trim();
-    if (representing === "seller" && !trimmedAddress) {
-      setError("Property address is required.");
-      return;
-    }
+    if (representing === "seller" && !trimmedAddress)
+      newErrors.push("Property address is required.");
 
     const trimmedClients = clients.map((c) => ({
       name: c.name.trim(),
@@ -205,49 +189,55 @@ function NewDeal() {
       phone: c.phone.trim(),
     }));
 
-    if (trimmedClients.some((c) => !c.name)) {
-      setError(
-        `Every ${clientLabel.toLowerCase()} needs a name (or remove the empty row).`,
-      );
-      return;
-    }
-    for (const c of trimmedClients) {
-      if (c.phone && !isValidPhone(c.phone)) {
-        setError(`Please enter a valid 10-digit phone number for ${c.name}.`);
-        return;
-      }
-      if (c.email && !isValidEmail(c.email)) {
-        setError(`Please enter a valid email address for ${c.name}.`);
-        return;
-      }
+    if (trimmedClients.some((c) => !c.name))
+      newErrors.push(`Every ${clientLabel.toLowerCase()} needs a name.`);
+
+    if (representing === "buyer") {
+      trimmedClients.forEach((c, i) => {
+        const label = trimmedClients.length > 1 ? ` ${i + 1}` : "";
+        if (!c.email)
+          newErrors.push(`${clientLabel}${label}: email is required.`);
+        if (!c.phone)
+          newErrors.push(`${clientLabel}${label}: phone is required.`);
+      });
     }
 
-    // Only validate co-agent splits if any were actually added -- a solo
-    // deal never needs to think about this at all.
+    trimmedClients.forEach((c) => {
+      if (c.phone && !isValidPhone(c.phone))
+        newErrors.push(
+          `"${c.name || "A client"}" has an invalid phone number — enter 10 digits.`,
+        );
+      if (c.email && !isValidEmail(c.email))
+        newErrors.push(
+          `"${c.name || "A client"}" has an invalid email address.`,
+        );
+    });
+
     if (coAgents.length > 0) {
-      if (coAgents.some((a) => !a.agentId)) {
-        setError(
+      if (coAgents.some((a) => !a.agentId))
+        newErrors.push(
           "Select an agent for every added row (or remove the empty row).",
         );
-        return;
-      }
       const mySplit = parseFloat(mySplitPct);
       const coSplits = coAgents.map((a) => parseFloat(a.splitPct));
       if (Number.isNaN(mySplit) || coSplits.some((s) => Number.isNaN(s))) {
-        setError("Enter a commission split for every agent.");
-        return;
-      }
-      const total = mySplit + coSplits.reduce((sum, s) => sum + s, 0);
-      if (Math.round(total * 100) / 100 !== 100) {
-        setError(
-          `Agent commission splits must add up to 100% (currently ${total}%).`,
-        );
-        return;
+        newErrors.push("Enter a commission split percentage for every agent.");
+      } else {
+        const total = mySplit + coSplits.reduce((sum, s) => sum + s, 0);
+        if (Math.round(total * 100) / 100 !== 100)
+          newErrors.push(
+            `Agent commission splits must add up to 100% (currently ${total}%).`,
+          );
       }
     }
 
+    if (newErrors.length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setErrors([]);
     setSubmitting(true);
-    setError(null);
 
     try {
       const clientInputs = trimmedClients.map((c, index) => {
@@ -264,8 +254,6 @@ function NewDeal() {
               : "tenant") as "seller" | "buyer" | "tenant",
         };
       });
-      // NOTE: createDealWithBoard currently always creates new clients via insertClients().
-      // See deals.ts change below -- insertClients needs to handle the existingId case.
 
       const { dealId } = await createDealWithBoard({
         agentId: session.user.id,
@@ -290,9 +278,6 @@ function NewDeal() {
         expectedCloseDate: expectedCloseDate || undefined,
       });
 
-      // The creator is already on the deal at 100% (set server-side by
-      // create_deal_with_board). If co-agents were added, adjust the
-      // creator's own split down and add each co-agent's row.
       if (coAgents.length > 0) {
         const myRow = (await getDealAgents(dealId)).find(
           (a) => a.agentId === session.user.id,
@@ -307,11 +292,11 @@ function NewDeal() {
 
       navigate(`/workflow/${dealId}`);
     } catch (err) {
-      setError(
+      setErrors([
         err instanceof Error
           ? err.message
           : "Something went wrong creating the deal.",
-      );
+      ]);
       setSubmitting(false);
     }
   }
@@ -319,7 +304,7 @@ function NewDeal() {
   return (
     <div className="p-4 max-w-2xl mx-auto">
       <h1>New Deal</h1>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
         <fieldset id="property" className="flex flex-col gap-2">
           <label className="flex gap-1 justify-between items-center">
             Deal type
@@ -344,16 +329,12 @@ function NewDeal() {
               <option value="rental">Tenant (rental)</option>
             </select>
           </label>
-          {/* //if the agent represents the seller the Property address is required,
-          if the agent represents the buyer or tenant the property address is
-          optional */}
           <legend className="font-medium">Property</legend>
           <input
             type="text"
             placeholder="Property address..."
             value={propertyAddress}
             onChange={(e) => setPropertyAddress(e.target.value)}
-            {...(representing === "seller" ? { required: true } : {})}
           />
 
           <label className="flex gap-1 justify-between items-center">
@@ -410,21 +391,18 @@ function NewDeal() {
                 value={client.name}
                 onChange={(e) => updateClient(index, "name", e.target.value)}
                 onBlur={(e) => handleClientNameBlur(index, e.target.value)}
-                required
               />
               <input
                 type="email"
                 placeholder={`${clientLabel} email...`}
                 value={client.email}
                 onChange={(e) => updateClient(index, "email", e.target.value)}
-                {...(representing === "buyer" ? { required: true } : {})}
               />
               <input
                 type="tel"
                 placeholder={`${clientLabel} phone...`}
                 value={client.phone}
                 onChange={(e) => updateClient(index, "phone", e.target.value)}
-                {...(representing === "buyer" ? { required: true } : {})}
               />
             </div>
           ))}
@@ -470,7 +448,6 @@ function NewDeal() {
                   updateCoAgent(index, "agentId", e.target.value)
                 }
                 className="flex-1"
-                required
               >
                 <option value="" disabled>
                   Select a colleague…
@@ -492,7 +469,6 @@ function NewDeal() {
                   updateCoAgent(index, "splitPct", e.target.value)
                 }
                 className="w-24"
-                required
               />
               <button
                 type="button"
@@ -557,7 +533,14 @@ function NewDeal() {
           </label>
         </fieldset>
 
-        {error && <p className="text-red-600">{error}</p>}
+        {/* Error block — all errors shown together just above submit */}
+        {errors.length > 0 && (
+          <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-lg text-sm flex flex-col gap-1">
+            {errors.map((err) => (
+              <p key={err}>• {err}</p>
+            ))}
+          </div>
+        )}
 
         <button
           type="submit"
@@ -567,6 +550,7 @@ function NewDeal() {
           {submitting ? "Creating…" : "Create Deal"}
         </button>
       </form>
+
       {duplicateDialogIndex !== null &&
         duplicateByIndex.get(duplicateDialogIndex) && (
           <ConfirmDialog
