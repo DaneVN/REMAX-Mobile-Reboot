@@ -27,7 +27,7 @@ interface WorkflowTask {
 }
 
 const DAY_MS = 1000 * 60 * 60 * 24;
-const MAX_TASKS_SHOWN = 8;
+// const MAX_TASKS_SHOWN = 8;
 const UNKNOWN_ADDRESS = "Other";
 
 function formatDueDate(dueDate: string) {
@@ -90,6 +90,10 @@ function WorkflowOverviewCard() {
       setLoading(true);
       setError(null);
 
+      const { count } = await supabase
+        .from("deals")
+        .select("*", { count: "exact" });
+
       // RLS scopes this to the signed-in agent's own boards
       // (or every board for admins), so no manual filter is needed here.
       const { data, error } = await supabase
@@ -103,7 +107,7 @@ function WorkflowOverviewCard() {
         .not("due_date", "is", null)
         .neq("column", "done")
         .order("due_date", { ascending: true })
-        .limit(MAX_TASKS_SHOWN);
+        .limit(count ? count : 0);
 
       if (!isMounted) return;
 
