@@ -56,7 +56,6 @@ function NewDeal() {
   const [listingPrice, setListingPrice] = useState("");
   const [purchasePrice, setPurchasePrice] = useState("");
   const [expectedCommission, setExpectedCommission] = useState("");
-  const [commissionSplitPct, setCommissionSplitPct] = useState("");
   const [expectedCloseDate, setExpectedCloseDate] = useState("");
 
   const [agentDirectory, setAgentDirectory] = useState<AgentDirectoryEntry[]>(
@@ -271,9 +270,6 @@ function NewDeal() {
         purchasePrice: purchasePrice ? parseFloat(purchasePrice) : undefined,
         expectedCommission: expectedCommission
           ? parseFloat(expectedCommission)
-          : undefined,
-        commissionSplitPct: commissionSplitPct
-          ? parseFloat(commissionSplitPct)
           : undefined,
         expectedCloseDate: expectedCloseDate || undefined,
       });
@@ -525,17 +521,6 @@ function NewDeal() {
             />
           </label>
           <label className="flex flex-col md:flex-row gap-1 justify-between items-center">
-            Percent commission you receive
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              value={commissionSplitPct}
-              onChange={(e) => setCommissionSplitPct(e.target.value)}
-            />
-          </label>
-          <label className="flex flex-col md:flex-row gap-1 justify-between items-center">
             Mandate end date
             <input
               type="date"
@@ -544,7 +529,7 @@ function NewDeal() {
             />
           </label>
           <label className="flex flex-col md:flex-row gap1 justify-between items-center">
-            Seller bond details (bank and account number)
+            Seller bond details (bank and account number) TBC
             <input
               type="text"
               value={bondDetails}

@@ -512,7 +512,7 @@ function EditDeal() {
     <div className="p-4 max-w-2xl mx-auto">
       <h1>Edit Deal</h1>
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-        <fieldset className="flex flex-col gap-2">
+        <fieldset id="property" className="flex flex-col gap-2">
           <legend className="font-medium">Property</legend>
           <input
             type="text"
@@ -521,7 +521,7 @@ function EditDeal() {
             onChange={(e) => setPropertyAddress(e.target.value)}
           />
 
-          <label className="flex gap-1 justify-between items-center">
+          <label className="flex flex-col sm:flex-row gap-1 justify-between items-center">
             Deal type
             <select
               value={dealType}
@@ -532,7 +532,7 @@ function EditDeal() {
             </select>
           </label>
 
-          <label className="flex gap-1 justify-between items-center">
+          <label className="flex flex-col sm:flex-row gap-1 justify-between items-center">
             Status
             <select
               value={status}
@@ -544,32 +544,40 @@ function EditDeal() {
             </select>
           </label>
 
-          <label className="flex gap-1 justify-between items-center">
+          <label className="flex flex-col sm:flex-row gap-1 justify-between items-center">
             {dealType === "sale" ? "Listing price" : "Monthly rent"}
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={listingPrice}
-              onChange={(e) => setListingPrice(e.target.value)}
-            />
-          </label>
-
-          {dealType === "sale" && (
-            <label className="flex gap-1 justify-between items-center">
-              Purchase price
+            <div className="flex gap-1 justify-baseline">
+              <p>R</p>
               <input
                 type="number"
                 step="0.01"
                 min="0"
-                value={purchasePrice}
-                onChange={(e) => setPurchasePrice(e.target.value)}
+                value={listingPrice}
+                placeholder="0.00"
+                onChange={(e) => setListingPrice(e.target.value)}
               />
+            </div>
+          </label>
+
+          {dealType === "sale" && (
+            <label className="flex flex-col sm:flex-row gap-1 justify-between items-center">
+              Purchase price
+              <div className="flex gap-1 justify items-baseline">
+                <p>R</p>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={purchasePrice}
+                  placeholder="0.00"
+                  onChange={(e) => setPurchasePrice(e.target.value)}
+                />
+              </div>
             </label>
           )}
         </fieldset>
 
-        <fieldset className="flex flex-col gap-2">
+        <fieldset id="attorney-bond" className="flex flex-col gap-2">
           <legend className="font-medium">Attorney & bond</legend>
           <AttorneyPicker value={attorneyId} onChange={setAttorneyId} />
           <input
@@ -580,9 +588,9 @@ function EditDeal() {
           />
         </fieldset>
 
-        <fieldset className="flex flex-col gap-2">
+        <fieldset id="comission" className="flex flex-col gap-2">
           <legend className="font-medium">Commission</legend>
-          <label className="flex gap-1 justify-between items-center">
+          <label className="flex flex-col sm:flex-row gap-1 justify-between items-center">
             Expected commission
             <input
               type="number"
@@ -592,7 +600,7 @@ function EditDeal() {
               onChange={(e) => setExpectedCommission(e.target.value)}
             />
           </label>
-          <label className="flex gap-1 justify-between items-center">
+          <label className="flex flex-col sm:flex-row gap-1 justify-between items-center">
             Commission split with another agency(%)
             <input
               type="number"
@@ -603,7 +611,7 @@ function EditDeal() {
               onChange={(e) => setCommissionSplitPct(e.target.value)}
             />
           </label>
-          <label className="flex gap-1 justify-between items-center">
+          <label className="flex flex-col sm:flex-row gap-1 justify-between items-center">
             Expected close date
             <input
               type="date"
@@ -634,7 +642,7 @@ function EditDeal() {
       <hr className="my-6" />
 
       {/* ── Agents section ── */}
-      <section className="flex flex-col gap-4">
+      <section id="agents" className="flex flex-col gap-4">
         <h2>Agents on this deal</h2>
         <p className="text-sm text-(--cl-dark-blue)/70">
           Internal split of the office's own commission share between assigned
@@ -763,7 +771,7 @@ function EditDeal() {
       <hr className="my-6" />
 
       {/* ── Clients section ── */}
-      <section className="flex flex-col gap-4">
+      <section id="clients" className="flex flex-col gap-4">
         <h2>Clients on this deal</h2>
 
         {clientsLoading && (
