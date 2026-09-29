@@ -130,12 +130,16 @@ function AttorneyPicker({ value, onChange }: AttorneyPickerProps) {
     );
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2 justify-center items-center w-full">
       {error && <p className="text-red-600 text-sm">{error}</p>}
 
       {!addingNew && (
         <>
-          <select value={value} onChange={handleSelectChange}>
+          <select
+            className="max-w-77.5 sm:max-w-full"
+            value={value}
+            onChange={handleSelectChange}
+          >
             <option value="">No attorney selected</option>
             {attorneys.map((a) => (
               <option key={a.id} value={a.id}>
@@ -166,7 +170,7 @@ function AttorneyPicker({ value, onChange }: AttorneyPickerProps) {
       )}
 
       {addingNew && (
-        <div className="flex flex-col gap-2 border rounded p-3">
+        <div className="flex flex-col gap-2 border rounded p-3 w-full">
           <span className="font-medium text-sm">Add a new attorney</span>
           <input
             type="text"

@@ -302,11 +302,16 @@ function NewDeal() {
   }
 
   return (
-    <div className="p-4 max-w-2xl mx-auto">
+    <div className="p-4 max-w-full mx-auto">
       <h1>New Deal</h1>
-      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-        <fieldset id="property" className="flex flex-col gap-2">
-          <label className="flex gap-1 justify-between items-center">
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        className="flex flex-col gap-4  overflow-hidden"
+      >
+        <fieldset id="property" className="flex flex-col gap-3">
+          <legend className="font-medium">Property</legend>
+          <label className="flex flex-col md:flex-row gap-1 justify-between items-center">
             Deal type
             <select
               value={dealType}
@@ -316,7 +321,7 @@ function NewDeal() {
               <option value="rental">Rental</option>
             </select>
           </label>
-          <label className="flex gap-1 justify-between items-center">
+          <label className="flex flex-col md:flex-row gap-1 justify-between items-center">
             Representing
             <select
               value={representing}
@@ -329,38 +334,49 @@ function NewDeal() {
               <option value="rental">Tenant (rental)</option>
             </select>
           </label>
-          <legend className="font-medium">Property</legend>
-          <input
-            type="text"
-            placeholder="Property address..."
-            value={propertyAddress}
-            onChange={(e) => setPropertyAddress(e.target.value)}
-          />
-
-          <label className="flex gap-1 justify-between items-center">
+          <label className="flex flex-col md:flex-row gap-1 justify-between items-center">
+            Property Address
+            <input
+              type="text"
+              placeholder=""
+              value={propertyAddress}
+              onChange={(e) => setPropertyAddress(e.target.value)}
+            />
+          </label>
+          <label className="flex flex-col md:flex-row gap-1 justify-between items-center">
             {representing === "seller"
               ? "Listing price"
               : representing === "buyer"
                 ? "Expected Price"
                 : "Rental price"}
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={listingPrice}
-              onChange={(e) => setListingPrice(e.target.value)}
-            />
-          </label>
-          {dealType === "sale" && (
-            <label className="flex gap-1 justify-between items-center">
-              Purchase price (once agreed)
+            <div className="flex gap-1">
+              <p>R</p>
               <input
                 type="number"
-                step="0.01"
                 min="0"
-                value={purchasePrice}
-                onChange={(e) => setPurchasePrice(e.target.value)}
+                step={0.01}
+                value={listingPrice}
+                placeholder="R0.00"
+                onChange={(e) => setListingPrice(e.target.value)}
               />
+            </div>
+          </label>
+          {dealType === "sale" && (
+            <label className="flex flex-col md:flex-row gap-1 justify-between items-center">
+              Purchase price (once agreed)
+              <div className="flex gap-1">
+                <p>R</p>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={purchasePrice}
+                  placeholder="R0.00"
+                  onChange={(e) => {
+                    setPurchasePrice(e.target.value);
+                  }}
+                />
+              </div>
             </label>
           )}
         </fieldset>
@@ -489,31 +505,27 @@ function NewDeal() {
           </button>
         </fieldset>
 
-        <fieldset id="attorney-bond" className="flex flex-col gap-2">
-          <legend className="font-medium">Attorney & bond</legend>
+        <fieldset id="attorney" className="flex flex-col gap-3 w-full">
+          <legend className="font-medium">Attorney</legend>
           <AttorneyPicker value={attorneyId} onChange={setAttorneyId} />
-          <input
-            type="text"
-            placeholder="Bond details..."
-            value={bondDetails}
-            onChange={(e) => setBondDetails(e.target.value)}
-          />
         </fieldset>
 
-        <fieldset id="commission" className="flex flex-col gap-2">
-          <legend className="font-medium">Commission</legend>
-          <label className="flex gap-1 justify-between items-center">
-            Expected commission
+        <fieldset id="commission-other" className="flex flex-col gap-3">
+          <legend className="font-medium">Commission and other</legend>
+          <label className="flex flex-col md:flex-row gap-1 justify-between items-center">
+            Expected commission percent plus VAT
             <input
               type="number"
               step="0.01"
               min="0"
+              max={100}
               value={expectedCommission}
               onChange={(e) => setExpectedCommission(e.target.value)}
+              className=""
             />
           </label>
-          <label className="flex gap-1 justify-between items-center">
-            Commission split (%)
+          <label className="flex flex-col md:flex-row gap-1 justify-between items-center">
+            Percent commission you receive
             <input
               type="number"
               step="0.01"
@@ -523,12 +535,20 @@ function NewDeal() {
               onChange={(e) => setCommissionSplitPct(e.target.value)}
             />
           </label>
-          <label className="flex gap-1 justify-between items-center">
-            Expected close date
+          <label className="flex flex-col md:flex-row gap-1 justify-between items-center">
+            Mandate end date
             <input
               type="date"
               value={expectedCloseDate}
               onChange={(e) => setExpectedCloseDate(e.target.value)}
+            />
+          </label>
+          <label className="flex flex-col md:flex-row gap1 justify-between items-center">
+            Seller bond details (bank and account number)
+            <input
+              type="text"
+              value={bondDetails}
+              onChange={(e) => setBondDetails(e.target.value)}
             />
           </label>
         </fieldset>
