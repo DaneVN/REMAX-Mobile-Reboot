@@ -298,20 +298,22 @@ function EditDeal() {
 
   // ── Helpers: does the new client's role differ from existing clients? ───────
 
-  function isNewSide(role: ClientRole): boolean {
-    const existingRoles = new Set(dealClients.map((c) => c.role));
-    // If there are no clients yet, or the role already exists, it's not a new side
+  function isNewSide(role: ClientRole, currentClients: DealClient[]): boolean {
+    const existingRoles = new Set(currentClients.map((c) => c.role));
     if (existingRoles.size === 0) return false;
     return !existingRoles.has(role);
   }
 
   // ── After a client is successfully inserted, decide whether to show modal ──
 
-  function afterClientAdded(addedClient: DealClient) {
-    setDealClients((prev) => [...prev, addedClient]);
-    // Only show the modal if this client represents a role not previously on the deal
-    // and the deal isn't already representing both sides
-    if (representing !== "both" && isNewSide(addedClient.role)) {
+  function afterClientAdded(
+    addedClient: DealClient,
+    previousClients: DealClient[],
+  ) {
+    if (
+      representing !== "both" &&
+      isNewSide(addedClient.role, previousClients)
+    ) {
       setPendingNewClient(addedClient);
       setBuyerSideStep("representing");
     }
@@ -341,6 +343,9 @@ function EditDeal() {
     setClientErrors([]);
     setAddingClient(true);
 
+    // Snapshot the list BEFORE the async insert — used by isNewSide
+    const previousClients = dealClients;
+
     try {
       const clientType =
         newClientRole === "seller"
@@ -356,18 +361,19 @@ function EditDeal() {
         type: clientType,
       });
 
-      // Refresh full list so we have the real row id
+      // Refresh full list — this is the single source of truth for the UI
       const refreshed = await getDealClients(dealId);
       const justAdded = refreshed.find(
         (c) => c.role === newClientRole && c.name === trimmedName,
       );
 
+      // Set once — afterClientAdded must NOT set it again
       setDealClients(refreshed);
       setNewClientName("");
       setNewClientEmail("");
       setNewClientPhone("");
 
-      if (justAdded) afterClientAdded(justAdded);
+      if (justAdded) afterClientAdded(justAdded, previousClients);
     } catch (err) {
       setClientErrors([
         err instanceof Error ? err.message : "Failed to add client.",
@@ -380,6 +386,9 @@ function EditDeal() {
   async function handleUseExistingClientOnDeal() {
     if (!dealId || !duplicateClient) return;
     setDuplicateDialogOpen(false);
+
+    // Snapshot before the insert
+    const previousClients = dealClients;
 
     try {
       const { error } = await supabase.from("deal_clients").insert({
@@ -394,12 +403,13 @@ function EditDeal() {
         (c) => c.role === newClientRole && c.name === duplicateClient.name,
       );
 
+      // Set once
       setDealClients(refreshed);
       setNewClientName("");
       setNewClientEmail("");
       setNewClientPhone("");
 
-      if (justAdded) afterClientAdded(justAdded);
+      if (justAdded) afterClientAdded(justAdded, previousClients);
     } catch (err) {
       setClientErrors([
         err instanceof Error ? err.message : "Failed to link existing client.",
