@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 import {
   updateDeal,
+  updateRepresenting,
   getDealClients,
   addClientToDeal,
   removeClientFromDeal,
@@ -21,9 +22,15 @@ import { isValidEmail, isValidPhone } from "../../lib/validators";
 import { useAuth } from "../../lib/AuthProvider";
 import AttorneyPicker from "../components/AttorneyPicker";
 import ConfirmDialog from "../components/ConfirmDialog";
+import AddBuyerSideModal from "../components/AddBuyerSideModal";
+import {
+  getWorkflowBoardByDeal,
+  appendTemplateTasks,
+} from "../../lib/workflow";
 
 type DealType = "sale" | "rental";
 type DealStatus = "active" | "closed" | "fell_through";
+type Representing = "seller" | "buyer" | "both";
 type ClientRole = "seller" | "buyer";
 
 type DealRow = {
@@ -31,6 +38,7 @@ type DealRow = {
   property_address: string;
   deal_type: DealType;
   status: DealStatus;
+  representing: Representing;
   attorney_id: string | null;
   bond_details: string | null;
   listing_price: number | null;
@@ -50,9 +58,11 @@ function EditDeal() {
   const [submitting, setSubmitting] = useState(false);
   const [dealErrors, setDealErrors] = useState<string[]>([]);
 
+  // Deal fields
   const [propertyAddress, setPropertyAddress] = useState("");
   const [dealType, setDealType] = useState<DealType>("sale");
   const [status, setStatus] = useState<DealStatus>("active");
+  const [representing, setRepresenting] = useState<Representing>("seller");
   const [attorneyId, setAttorneyId] = useState("");
   const [bondDetails, setBondDetails] = useState("");
   const [listingPrice, setListingPrice] = useState("");
@@ -72,6 +82,8 @@ function EditDeal() {
   const [newClientEmail, setNewClientEmail] = useState("");
   const [newClientPhone, setNewClientPhone] = useState("");
   const [addingClient, setAddingClient] = useState(false);
+
+  // Duplicate client detection
   const [duplicateClient, setDuplicateClient] = useState<{
     id: string;
     name: string;
@@ -80,6 +92,16 @@ function EditDeal() {
   } | null>(null);
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
 
+  // Buyer-side modal state
+  // Tracks the client that was just successfully added, pending the modal flow
+  const [pendingNewClient, setPendingNewClient] = useState<DealClient | null>(
+    null,
+  );
+  const [buyerSideStep, setBuyerSideStep] = useState<
+    "representing" | "addTasks" | null
+  >(null);
+  const [appending, setAppending] = useState(false);
+
   // -- Agent management state --
   const [dealAgents, setDealAgents] = useState<DealAgent[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(true);
@@ -87,13 +109,14 @@ function EditDeal() {
   const [removingAgentId, setRemovingAgentId] = useState<string | null>(null);
   const [savingSplitId, setSavingSplitId] = useState<string | null>(null);
   const [splitDrafts, setSplitDrafts] = useState<Record<string, string>>({});
-
   const [agentDirectory, setAgentDirectory] = useState<AgentDirectoryEntry[]>(
     [],
   );
   const [newAgentId, setNewAgentId] = useState("");
   const [newAgentSplit, setNewAgentSplit] = useState("");
   const [addingAgent, setAddingAgent] = useState(false);
+
+  // ── Load deal ──────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!dealId) return;
@@ -102,23 +125,22 @@ function EditDeal() {
     supabase
       .from("deals")
       .select(
-        "id, property_address, deal_type, status, attorney_id, bond_details, listing_price, purchase_price, expected_commission, commission_split_pct, expected_close_date",
+        "id, property_address, deal_type, status, representing, attorney_id, bond_details, listing_price, purchase_price, expected_commission, commission_split_pct, expected_close_date",
       )
       .eq("id", dealId)
       .single()
       .then(({ data, error }) => {
         if (cancelled) return;
-
         if (error || !data) {
           setNotFound(true);
           setLoading(false);
           return;
         }
-
         const deal = data as DealRow;
         setPropertyAddress(deal.property_address);
         setDealType(deal.deal_type);
         setStatus(deal.status);
+        setRepresenting(deal.representing ?? "seller");
         setAttorneyId(deal.attorney_id ?? "");
         setBondDetails(deal.bond_details ?? "");
         setListingPrice(deal.listing_price?.toString() ?? "");
@@ -134,10 +156,11 @@ function EditDeal() {
     };
   }, [dealId]);
 
+  // ── Load clients ───────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (!dealId) return;
     let cancelled = false;
-
     getDealClients(dealId)
       .then((data) => {
         if (cancelled) return;
@@ -150,26 +173,23 @@ function EditDeal() {
         setClientErrors(["Couldn't load clients for this deal."]);
         setClientsLoading(false);
       });
-
     return () => {
       cancelled = true;
     };
   }, [dealId]);
 
+  // ── Load agents ────────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (!dealId) return;
     let cancelled = false;
-
     getDealAgents(dealId)
       .then((data) => {
         if (cancelled) return;
         setDealAgents(data);
         setSplitDrafts(
           Object.fromEntries(
-            data.map((agent) => [
-              agent.id,
-              agent.commissionSplitPct.toString(),
-            ]),
+            data.map((a) => [a.id, a.commissionSplitPct.toString()]),
           ),
         );
         setAgentsLoading(false);
@@ -180,7 +200,6 @@ function EditDeal() {
         setAgentErrors(["Couldn't load agents for this deal."]);
         setAgentsLoading(false);
       });
-
     return () => {
       cancelled = true;
     };
@@ -188,7 +207,6 @@ function EditDeal() {
 
   useEffect(() => {
     let cancelled = false;
-
     listAllAgents()
       .then((data) => {
         if (cancelled) return;
@@ -202,6 +220,8 @@ function EditDeal() {
       cancelled = true;
     };
   }, []);
+
+  // ── Deal form submit ───────────────────────────────────────────────────────
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -242,17 +262,18 @@ function EditDeal() {
           : undefined,
         expectedCloseDate: expectedCloseDate || undefined,
       });
-
       navigate(`/workflow/${dealId}`);
     } catch (err) {
       setDealErrors([
         err instanceof Error
           ? err.message
-          : "Something went wrong updating the board.",
+          : "Something went wrong updating the deal.",
       ]);
       setSubmitting(false);
     }
   }
+
+  // ── Duplicate client detection ─────────────────────────────────────────────
 
   async function handleNewClientNameBlur(name: string) {
     const trimmed = name.trim();
@@ -266,7 +287,6 @@ function EditDeal() {
       .maybeSingle();
 
     if (error || !data) return;
-
     setDuplicateClient({
       id: data.id,
       name: data.name,
@@ -275,6 +295,29 @@ function EditDeal() {
     });
     setDuplicateDialogOpen(true);
   }
+
+  // ── Helpers: does the new client's role differ from existing clients? ───────
+
+  function isNewSide(role: ClientRole): boolean {
+    const existingRoles = new Set(dealClients.map((c) => c.role));
+    // If there are no clients yet, or the role already exists, it's not a new side
+    if (existingRoles.size === 0) return false;
+    return !existingRoles.has(role);
+  }
+
+  // ── After a client is successfully inserted, decide whether to show modal ──
+
+  function afterClientAdded(addedClient: DealClient) {
+    setDealClients((prev) => [...prev, addedClient]);
+    // Only show the modal if this client represents a role not previously on the deal
+    // and the deal isn't already representing both sides
+    if (representing !== "both" && isNewSide(addedClient.role)) {
+      setPendingNewClient(addedClient);
+      setBuyerSideStep("representing");
+    }
+  }
+
+  // ── Add client ─────────────────────────────────────────────────────────────
 
   async function handleAddClient(e: React.FormEvent) {
     e.preventDefault();
@@ -290,7 +333,6 @@ function EditDeal() {
       newErrors.push("Phone number is invalid — enter 10 digits.");
     if (trimmedEmail && !isValidEmail(trimmedEmail))
       newErrors.push("Email address is invalid.");
-
     if (newErrors.length > 0) {
       setClientErrors(newErrors);
       return;
@@ -314,12 +356,18 @@ function EditDeal() {
         type: clientType,
       });
 
+      // Refresh full list so we have the real row id
       const refreshed = await getDealClients(dealId);
-      setDealClients(refreshed);
+      const justAdded = refreshed.find(
+        (c) => c.role === newClientRole && c.name === trimmedName,
+      );
 
+      setDealClients(refreshed);
       setNewClientName("");
       setNewClientEmail("");
       setNewClientPhone("");
+
+      if (justAdded) afterClientAdded(justAdded);
     } catch (err) {
       setClientErrors([
         err instanceof Error ? err.message : "Failed to add client.",
@@ -342,10 +390,16 @@ function EditDeal() {
       if (error) throw error;
 
       const refreshed = await getDealClients(dealId);
+      const justAdded = refreshed.find(
+        (c) => c.role === newClientRole && c.name === duplicateClient.name,
+      );
+
       setDealClients(refreshed);
       setNewClientName("");
       setNewClientEmail("");
       setNewClientPhone("");
+
+      if (justAdded) afterClientAdded(justAdded);
     } catch (err) {
       setClientErrors([
         err instanceof Error ? err.message : "Failed to link existing client.",
@@ -358,13 +412,11 @@ function EditDeal() {
   async function handleRemoveClient(dealClientRowId: string) {
     setClientErrors([]);
     setRemovingId(dealClientRowId);
-
     if (dealClients.length <= 1) {
       setClientErrors(["Your deal must have at least one client."]);
       setRemovingId(null);
       return;
     }
-
     try {
       await removeClientFromDeal(dealClientRowId);
       setDealClients((prev) => prev.filter((c) => c.id !== dealClientRowId));
@@ -376,6 +428,65 @@ function EditDeal() {
       setRemovingId(null);
     }
   }
+
+  // ── Buyer-side modal handlers ──────────────────────────────────────────────
+
+  // Step 1 — "Yes, I'm representing them"
+  async function handleRepresentingYes() {
+    if (!dealId) return;
+    // Update representing on the deal to 'both' (all new deals start as seller)
+    const newRepresenting: Representing = "both";
+    try {
+      await updateRepresenting(dealId, newRepresenting);
+      setRepresenting(newRepresenting);
+    } catch (err) {
+      setClientErrors([
+        err instanceof Error ? err.message : "Failed to update representing.",
+      ]);
+      closeBuyerSideModal();
+      return;
+    }
+    // Advance to step 2
+    setBuyerSideStep("addTasks");
+  }
+
+  // Step 1 — "Just recording"
+  function handleRepresentingNo() {
+    closeBuyerSideModal();
+  }
+
+  // Step 2 — "Yes, add tasks"
+  async function handleAddTasksYes() {
+    if (!dealId) return;
+    setAppending(true);
+    try {
+      const board = await getWorkflowBoardByDeal(dealId);
+      if (!board) throw new Error("No workflow board found for this deal.");
+      // Use 'both' template if it exists, otherwise fall back to the new side's role
+      const templateType =
+        representing === "both" ? "both" : (pendingNewClient?.role ?? "buyer");
+      await appendTemplateTasks(board.id, templateType as "buyer" | "both");
+    } catch (err) {
+      setClientErrors([
+        err instanceof Error ? err.message : "Failed to add tasks.",
+      ]);
+    } finally {
+      setAppending(false);
+      closeBuyerSideModal();
+    }
+  }
+
+  // Step 2 — "Not now"
+  function handleAddTasksNo() {
+    closeBuyerSideModal();
+  }
+
+  function closeBuyerSideModal() {
+    setBuyerSideStep(null);
+    setPendingNewClient(null);
+  }
+
+  // ── Agent handlers ─────────────────────────────────────────────────────────
 
   const availableAgents = agentDirectory.filter(
     (a) => !dealAgents.some((da) => da.agentId === a.id),
@@ -391,13 +502,11 @@ function EditDeal() {
   async function handleAddAgent(e: React.FormEvent) {
     e.preventDefault();
     if (!dealId) return;
-
     const newErrors: string[] = [];
     if (!newAgentId) newErrors.push("Select an agent to add.");
     const splitValue = parseFloat(newAgentSplit);
     if (Number.isNaN(splitValue) || splitValue < 0 || splitValue > 100)
       newErrors.push("Enter a commission split between 0 and 100.");
-
     if (newErrors.length > 0) {
       setAgentErrors(newErrors);
       return;
@@ -405,17 +514,13 @@ function EditDeal() {
 
     setAgentErrors([]);
     setAddingAgent(true);
-
     try {
       await addAgentToDeal(dealId, newAgentId, splitValue);
       const refreshed = await getDealAgents(dealId);
       setDealAgents(refreshed);
       setSplitDrafts(
         Object.fromEntries(
-          refreshed.map((agent) => [
-            agent.id,
-            agent.commissionSplitPct.toString(),
-          ]),
+          refreshed.map((a) => [a.id, a.commissionSplitPct.toString()]),
         ),
       );
       setNewAgentId("");
@@ -441,10 +546,8 @@ function EditDeal() {
       setAgentErrors(["Enter a commission split between 0 and 100."]);
       return;
     }
-
     setSavingSplitId(dealAgentRowId);
     setAgentErrors([]);
-
     try {
       await updateAgentSplit(dealAgentRowId, splitValue);
       setDealAgents((prev) =>
@@ -472,7 +575,6 @@ function EditDeal() {
       setAgentErrors(["A deal must have at least one assigned agent."]);
       return;
     }
-
     setAgentErrors([]);
     setRemovingAgentId(dealAgentRowId);
     try {
@@ -492,18 +594,19 @@ function EditDeal() {
     }
   }
 
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   if (loading)
     return (
       <img src="/blocks-shuffle-3.svg" alt="Loading..." className="w-6 h-6" />
     );
 
-  if (notFound) {
+  if (notFound)
     return (
       <div className="p-4">
         <p>This deal doesn't exist, or you don't have access to it.</p>
       </div>
     );
-  }
 
   const sellers = dealClients.filter((c) => c.role === "seller");
   const buyers = dealClients.filter((c) => c.role === "buyer");
@@ -511,6 +614,12 @@ function EditDeal() {
   return (
     <div className="p-4 max-w-2xl mx-auto">
       <h1>Edit Deal</h1>
+
+      {/* Representing badge — read-only, driven by DB */}
+      <p className="text-sm text-(--cl-dark-blue)/60 mb-4 capitalize">
+        Representing: <span className="font-medium">{representing}</span>
+      </p>
+
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
         <fieldset id="property" className="flex flex-col gap-2">
           <legend className="font-medium">Property</legend>
@@ -588,7 +697,7 @@ function EditDeal() {
           />
         </fieldset>
 
-        <fieldset id="comission" className="flex flex-col gap-2">
+        <fieldset id="commission" className="flex flex-col gap-2">
           <legend className="font-medium">Commission</legend>
           <label className="flex flex-col sm:flex-row gap-1 justify-between items-center">
             Expected commission
@@ -701,7 +810,6 @@ function EditDeal() {
                 </div>
               </div>
             ))}
-
             <p
               className={`text-sm ${totalSplitPct === 100 ? "text-(--cl-dark-blue)/70" : "text-red-600"}`}
             >
@@ -718,7 +826,6 @@ function EditDeal() {
           className="flex flex-col gap-2 border rounded p-3"
         >
           <span className="font-medium text-sm">Add an agent</span>
-
           <label className="flex gap-1 justify-between items-center">
             Agent
             <select
@@ -735,7 +842,6 @@ function EditDeal() {
               ))}
             </select>
           </label>
-
           <label className="flex gap-1 justify-between items-center">
             Commission split (%)
             <input
@@ -757,7 +863,6 @@ function EditDeal() {
               ))}
             </div>
           )}
-
           <button
             type="submit"
             disabled={addingAgent || !newAgentId}
@@ -850,7 +955,6 @@ function EditDeal() {
           className="flex flex-col gap-2 border rounded p-3"
         >
           <span className="font-medium text-sm">Add a client</span>
-
           <label className="flex gap-1 justify-between items-center">
             Role
             <select
@@ -863,7 +967,6 @@ function EditDeal() {
               </option>
             </select>
           </label>
-
           <input
             type="text"
             placeholder="Name..."
@@ -903,6 +1006,7 @@ function EditDeal() {
         </form>
       </section>
 
+      {/* ── Duplicate client dialog ── */}
       {duplicateClient && (
         <ConfirmDialog
           open={duplicateDialogOpen}
@@ -917,6 +1021,20 @@ function EditDeal() {
             setDuplicateDialogOpen(false);
             setDuplicateClient(null);
           }}
+        />
+      )}
+
+      {/* ── Buyer-side two-step modal ── */}
+      {buyerSideStep !== null && pendingNewClient && (
+        <AddBuyerSideModal
+          step={buyerSideStep}
+          newClientRole={pendingNewClient.role}
+          newClientName={pendingNewClient.name}
+          appending={appending}
+          onRepresentingYes={handleRepresentingYes}
+          onRepresentingNo={handleRepresentingNo}
+          onAddTasksYes={handleAddTasksYes}
+          onAddTasksNo={handleAddTasksNo}
         />
       )}
     </div>

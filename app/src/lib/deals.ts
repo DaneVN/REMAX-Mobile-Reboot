@@ -307,3 +307,19 @@ export async function listAllAgents(): Promise<
   if (error) throw error;
   return (data ?? []).map((p) => ({ id: p.id, fullName: p.full_name }));
 }
+
+// ---------------------------------------------------------------------------
+// Persist who the agent represents on a deal.
+// Called when a second-side client is added and the agent confirms representation.
+// ---------------------------------------------------------------------------
+export async function updateRepresenting(
+  dealId: string,
+  representing: "seller" | "buyer" | "both",
+): Promise<void> {
+  const { error } = await supabase
+    .from("deals")
+    .update({ representing })
+    .eq("id", dealId);
+
+  if (error) throw error;
+}

@@ -13,17 +13,19 @@ import { useNavigate } from "react-router-dom";
 import AddTaskModal from "../components/AddTaskModal";
 import { deleteTask } from "../../lib/workflow";
 
+type DealSummary = {
+  id: string;
+  property_address: string;
+  deal_type: string;
+  status: string;
+  representing: "seller" | "buyer" | "both";
+};
+
 function Workflow() {
   const { dealId } = useParams<{ dealId: string }>();
   const [board, setBoard] = useState<WorkflowBoard | null>(null);
-  const [deals, setDeals] = useState<
-    {
-      id: string;
-      property_address: string;
-      deal_type: string;
-      status: string;
-    }[]
-  >([]);
+  const [deal, setDeal] = useState<DealSummary | null>(null);
+  const [firstBuyerName, setFirstBuyerName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
 
@@ -39,15 +41,13 @@ function Workflow() {
   const navigate = useNavigate();
 
   function showMoreTasks(column: WorkflowTask["column"]) {
-    //toggle expanded state based on if the column is already expanded or not
-    if (expandedColumns[column]) {
-      setExpandedColumns((current) => ({ ...current, [column]: false }));
-    } else {
-      setExpandedColumns((current) => ({ ...current, [column]: true }));
-    }
+    setExpandedColumns((current) => ({
+      ...current,
+      [column]: !current[column],
+    }));
   }
 
-  /** Fetch workflow board for the given dealId */
+  // ── Load board ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!dealId) return;
     getWorkflowBoardByDeal(dealId)
@@ -55,21 +55,22 @@ function Workflow() {
       .finally(() => setLoading(false));
   }, [dealId]);
 
-  /** Fetch active deals */
+  // ── Load deal (representing + property_address) ────────────────────────────
   useEffect(() => {
+    if (!dealId) return;
     let cancelled = false;
 
     supabase
       .from("deals")
-      .select("id, property_address, deal_type, status")
-      .eq("status", "active")
-      .order("created_at", { ascending: false })
+      .select("id, property_address, deal_type, status, representing")
+      .eq("id", dealId)
+      .single()
       .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) {
+        if (cancelled || error || !data) {
           console.error("Failed to fetch deals:", error);
+          return;
         }
-        setDeals(data ?? []);
+        setDeal(data as DealSummary);
         setLoading(false);
       });
 
@@ -78,10 +79,44 @@ function Workflow() {
     };
   }, [dealId]);
 
-  /**
-   * Merge an updated task back into the board's local state.
-   * Replaces the matching task by id, in place, without a refetch.
-   */
+  // ── Load first buyer's name when representing is buyer or both ─────────────
+  useEffect(() => {
+    if (!dealId || !deal) return;
+    if (deal.representing === "seller") return; // property address used — no need
+
+    let cancelled = false;
+
+    supabase
+      .from("deal_clients")
+      .select("clients(name)")
+      .eq("deal_id", dealId)
+      .eq("role", "buyer")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled || error || !data) return;
+        const name =
+          (data as { clients: { name: string } | null }).clients?.name ?? null;
+        setFirstBuyerName(name);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dealId, deal]);
+
+  // ── Board title logic ──────────────────────────────────────────────────────
+  // seller → property address
+  // buyer  → first buyer's name (fallback: property address)
+  // both   → property address (board originated as a seller deal)
+  function getBoardTitle(): string {
+    if (!deal) return "Loading…";
+    if (deal.representing === "buyer" && firstBuyerName) return firstBuyerName;
+    return deal.property_address || "Unknown Address";
+  }
+
+  // ── Task saved handler ─────────────────────────────────────────────────────
   function handleTaskSaved(updatedTask: WorkflowTask) {
     //check if this task is the last task to be completed in the board, and if so, ask the user useing ConfirmDialog if they want to mark the deal as completed
 
@@ -97,7 +132,6 @@ function Workflow() {
 
     setBoard((currentBoard) => {
       if (!currentBoard) return currentBoard;
-
       return {
         ...currentBoard,
         workflow_tasks: currentBoard.workflow_tasks.map((task) =>
@@ -106,10 +140,6 @@ function Workflow() {
       };
     });
   }
-
-  /** Get the property address for the current deal */
-  const currentDeal = deals?.find((deal) => deal.id === dealId);
-  const propertyAddress = currentDeal?.property_address || "Unknown Address";
 
   if (loading)
     return (
@@ -141,10 +171,14 @@ function Workflow() {
         {/* Use deal table's property_address field as Board header */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
           <div className="flex justify-between items-center col-span-2">
-            <h1 className="text-2xl font-bold">{propertyAddress}</h1>
-            <p className="text-sm text-(--cl-dark-blue)">
-              {board.workflow_tasks.length} tasks
-            </p>
+            <h1 className="text-2xl font-bold">{getBoardTitle()}</h1>
+
+            {/* Representing indicator */}
+            {deal && deal.representing !== "seller" && (
+              <p className="text-sm text-(--cl-dark-blue)/60 capitalize -mt-2">
+                Representing: {deal.representing}
+              </p>
+            )}
           </div>
           <button
             onClick={() => {

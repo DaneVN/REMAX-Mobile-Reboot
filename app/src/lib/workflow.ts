@@ -7,6 +7,7 @@ export type WorkflowTask = {
   column: "todo" | "doing" | "done";
   due_date: string | null;
   sort_order: number;
+  stage: number;
 };
 
 export type WorkflowBoard = {
@@ -162,4 +163,24 @@ export async function deleteTask(taskId: string): Promise<void> {
     .eq("id", taskId);
 
   if (error) throw error;
+}
+
+/* Append template tasks for a new side (buyer | both) to an existing board.
+ * Due dates are anchored to today and spread forward by the template offsets.
+ * Returns the number of tasks inserted.
+ */
+export async function appendTemplateTasks(
+  boardId: string,
+  clientType: "buyer" | "both",
+): Promise<number> {
+  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+  const { data, error } = await supabase.rpc("append_template_tasks_to_board", {
+    p_board_id: boardId,
+    p_client_type: clientType,
+    p_base_date: today,
+  });
+
+  if (error) throw error;
+  return (data as number) ?? 0;
 }
