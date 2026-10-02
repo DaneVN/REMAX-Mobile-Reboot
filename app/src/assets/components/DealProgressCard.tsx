@@ -4,6 +4,7 @@ import {
   getActiveDealsProgress,
   type DealProgress,
 } from "../../lib/deal_progress";
+import { getBoardTitle } from "../../lib/boardTitle";
 
 const TOTAL_STAGES = 7;
 
@@ -75,7 +76,13 @@ function DealProgressCard() {
                   className="block bg-(--cl-white) rounded p-3 hover:shadow-lg transition-shadow"
                 >
                   <div className="flex justify-between items-baseline mb-1">
-                    <span className="font-medium">{deal.propertyAddress}</span>
+                    <span className="font-medium">
+                      {getBoardTitle(
+                        deal.representing,
+                        deal.propertyAddress,
+                        deal.firstBuyerName,
+                      )}
+                    </span>
                     <span className="text-sm">
                       Stage {deal.currentStage} of {TOTAL_STAGES}
                     </span>

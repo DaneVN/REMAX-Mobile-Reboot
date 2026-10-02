@@ -4,6 +4,7 @@ import { supabase } from "../../lib/supabaseClient";
 import { archiveDeal } from "../../lib/deals";
 // import { useUserRole } from "../../lib/useUserRole";
 // import ConfirmDialog from "../components/ConfirmDialog";
+import { getBoardTitle } from "../../lib/boardTitle";
 
 type DealSummary = {
   id: string;
@@ -11,6 +12,8 @@ type DealSummary = {
   deal_type: "sale" | "rental";
   status: string;
   hasOverdueTask: boolean;
+  representing: "seller" | "buyer" | "both";
+  firstBuyerName: string | null;
 };
 
 // Raw shape as it comes back from the nested select, before we collapse it
@@ -20,6 +23,8 @@ type DealRow = {
   property_address: string;
   deal_type: string;
   status: string;
+  representing: string;
+  deal_clients: { role: string; clients: { name: string } | null }[];
   workflow_boards: {
     workflow_tasks: {
       due_date: string | null;
@@ -52,8 +57,9 @@ function WorkflowIndex() {
     supabase
       .from("deals")
       .select(
-        `id, property_address, deal_type, status,
-         workflow_boards ( workflow_tasks ( due_date, column ) )`,
+        `id, property_address, deal_type, status, representing,
+        deal_clients ( role, clients ( name ) ),
+        workflow_boards ( workflow_tasks ( due_date, column ) )`,
       )
       .eq("status", "active")
       .eq("is_deleted", false)
@@ -69,6 +75,10 @@ function WorkflowIndex() {
         const rows = (data ?? []) as unknown as DealRow[];
         const summaries: DealSummary[] = rows.map((row) => {
           const allTasks = row.workflow_boards.flatMap((b) => b.workflow_tasks);
+          const firstBuyerName =
+            (row.deal_clients ?? []).filter((dc) => dc.role === "buyer")[0]
+              ?.clients?.name ?? null;
+
           return {
             id: row.id,
             property_address: row.property_address,
@@ -77,6 +87,11 @@ function WorkflowIndex() {
             hasOverdueTask: allTasks.some((t) =>
               isTaskOverdue(t.due_date, t.column),
             ),
+            representing: (row.representing ?? "seller") as
+              | "seller"
+              | "buyer"
+              | "both",
+            firstBuyerName,
           };
         });
 
@@ -140,7 +155,13 @@ function WorkflowIndex() {
           }`}
         >
           <Link to={`/workflow/${deal.id}`} className="flex-1">
-            <p className="font-medium">{deal.property_address}</p>
+            <p className="font-medium">
+              {getBoardTitle(
+                deal.representing,
+                deal.property_address,
+                deal.firstBuyerName,
+              )}
+            </p>
             <p className="text-sm capitalize">
               {deal.deal_type} · {deal.status}
               {deal.hasOverdueTask && (

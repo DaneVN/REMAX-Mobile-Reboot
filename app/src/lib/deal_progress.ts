@@ -3,14 +3,11 @@ import { supabase } from "./supabaseClient";
 export type DealProgress = {
   dealId: string;
   propertyAddress: string;
-  currentStage: number; // 1-7
+  representing: "seller" | "buyer" | "both";
+  firstBuyerName: string | null;
+  currentStage: number;
 };
 
-/**
- * For each of the logged-in agent's active deals, returns the highest
- * stage (1-7) that has at least one completed task on that deal's board.
- * RLS scopes this to the current agent automatically -- no manual filter needed.
- */
 export async function getActiveDealsProgress(): Promise<DealProgress[]> {
   const { data, error } = await supabase
     .from("deals")
@@ -18,6 +15,8 @@ export async function getActiveDealsProgress(): Promise<DealProgress[]> {
       `
       id,
       property_address,
+      representing,
+      deal_clients ( role, clients ( name ) ),
       workflow_boards (
         workflow_tasks ( stage, column )
       )
@@ -35,9 +34,21 @@ export async function getActiveDealsProgress(): Promise<DealProgress[]> {
       .map((t) => t.stage);
     const currentStage = doneStages.length > 0 ? Math.max(...doneStages) : 1;
 
+    const firstBuyer = (deal.deal_clients ?? [])
+      .filter((dc) => dc.role === "buyer")
+      .sort()[0];
+
+    const firstBuyerName =
+      (firstBuyer?.clients as { name: string } | null)?.name ?? null;
+
     return {
       dealId: deal.id,
       propertyAddress: deal.property_address,
+      representing: (deal.representing ?? "seller") as
+        | "seller"
+        | "buyer"
+        | "both",
+      firstBuyerName,
       currentStage,
     };
   });

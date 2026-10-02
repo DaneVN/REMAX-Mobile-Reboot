@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../../lib/supabaseClient"; // adjust to your actual client path
+import { supabase } from "../../lib/supabaseClient";
+import { getBoardTitle } from "../../lib/boardTitle";
 
 interface WorkflowTask {
   id: string;
@@ -22,6 +23,8 @@ interface WorkflowTask {
       property_address: string;
       status: string | null;
       is_deleted: boolean | null;
+      representing: "seller" | "buyer" | "both" | null;
+      deal_clients: { role: string; clients: { name: string } | null }[];
     } | null;
   } | null;
 }
@@ -55,22 +58,28 @@ function formatDueDate(dueDate: string) {
   };
 }
 
-// Groups the flat, due-date-sorted task list into { address: tasks[] },
-// preserving each group's internal order (earliest due date first, since
-// the query already sorted before this runs).
-function groupTasksByAddress(
-  tasks: WorkflowTask[],
-): [string, WorkflowTask[]][] {
+function groupTasksByTitle(tasks: WorkflowTask[]): [string, WorkflowTask[]][] {
   const groups = new Map<string, WorkflowTask[]>();
 
   for (const task of tasks) {
-    const address =
-      task.workflow_boards?.deals?.property_address ?? UNKNOWN_ADDRESS;
-    const existing = groups.get(address);
+    const deal = task.workflow_boards?.deals;
+    const firstBuyerName =
+      (deal?.deal_clients ?? []).filter((dc) => dc.role === "buyer")[0]?.clients
+        ?.name ?? null;
+
+    const title = deal
+      ? getBoardTitle(
+          (deal.representing ?? "seller") as "seller" | "buyer" | "both",
+          deal.property_address,
+          firstBuyerName,
+        )
+      : UNKNOWN_ADDRESS;
+
+    const existing = groups.get(title);
     if (existing) {
       existing.push(task);
     } else {
-      groups.set(address, [task]);
+      groups.set(title, [task]);
     }
   }
 
@@ -100,7 +109,16 @@ function WorkflowOverviewCard() {
         .from("workflow_tasks")
         .select(
           `id, board_id, title, column, due_date, template_source_id, sort_order, created_at, description,
-           workflow_boards ( deal_id, deals ( property_address, status, is_deleted ) )`,
+          workflow_boards (
+            deal_id,
+            deals (
+              property_address,
+              status,
+              is_deleted,
+              representing,
+              deal_clients ( role, clients ( name ) )
+            )
+          )`,
         )
         .eq("workflow_boards.deals.status", "active")
         .eq("workflow_boards.deals.is_deleted", false)
@@ -149,7 +167,7 @@ function WorkflowOverviewCard() {
     }
   }
 
-  const groupedTasks = groupTasksByAddress(tasks);
+  const groupedTasks = groupTasksByTitle(tasks);
 
   return (
     <div

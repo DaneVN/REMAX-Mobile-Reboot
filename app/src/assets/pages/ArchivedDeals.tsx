@@ -2,12 +2,15 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 import { restoreDeal } from "../../lib/deals";
+import { getBoardTitle } from "../../lib/boardTitle";
 
 type ArchivedDeal = {
   id: string;
   property_address: string;
   deal_type: "sale" | "rental";
   status: string;
+  representing: "seller" | "buyer" | "both";
+  firstBuyerName: string | null;
 };
 
 function ArchivedDeals() {
@@ -21,7 +24,9 @@ function ArchivedDeals() {
 
     supabase
       .from("deals")
-      .select("id, property_address, deal_type, status")
+      .select(
+        "id, property_address, deal_type, status, representing, deal_clients ( role, clients ( name ) )",
+      )
       .eq("is_deleted", true)
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
@@ -31,7 +36,26 @@ function ArchivedDeals() {
           console.error("Failed to fetch archived boards:", error);
           setError("Couldn't load archived boards.");
         }
-        setDeals((data ?? []) as ArchivedDeal[]);
+
+        const mapped: ArchivedDeal[] = (data ?? []).map((row) => {
+          const firstBuyerName =
+            (row.deal_clients ?? []).filter(
+              (dc: { role: string }) => dc.role === "buyer",
+            )[0]?.clients?.name ?? null;
+          return {
+            id: row.id,
+            property_address: row.property_address,
+            deal_type: row.deal_type as "sale" | "rental",
+            status: row.status,
+            representing: (row.representing ?? "seller") as
+              | "seller"
+              | "buyer"
+              | "both",
+            firstBuyerName,
+          };
+        });
+        setDeals(mapped);
+
         setLoading(false);
       });
 
@@ -77,7 +101,13 @@ function ArchivedDeals() {
           className="bg-(--cl-white) text-(--cl-dark-blue) p-4 rounded shadow-md flex justify-between items-center"
         >
           <div>
-            <p className="font-medium">{deal.property_address}</p>
+            <p className="font-medium">
+              {getBoardTitle(
+                deal.representing,
+                deal.property_address,
+                deal.firstBuyerName,
+              )}
+            </p>{" "}
             <p className="text-sm capitalize">
               {deal.deal_type} · {deal.status}
             </p>
