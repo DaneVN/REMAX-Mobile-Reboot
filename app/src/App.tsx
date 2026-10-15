@@ -5,7 +5,7 @@ import Workflow from "./assets/pages/Workflow";
 import NewDeal from "./assets/pages/NewDeal";
 import EditDeal from "./assets/pages/EditDeal";
 import ArchivedDeals from "./assets/pages/ArchivedDeals";
-// import Pipeline from "./assets/pages/Pipeline";
+import Pipeline from "./assets/pages/Pipeline";
 import Calculator from "./assets/pages/Calculator";
 // import Stats from "./assets/pages/Stats";
 import AuthRequired from "./assets/components/AuthRequired";
@@ -21,9 +21,7 @@ import AdminRequired from "./assets/components/AdminRequired";
  */
 
 function App({ classN }: { classN: string }) {
-  // classN datatype is string, but React passes it as an object, so we need to destructure it from the props object
   return (
-    // apply classN to the root div of the app for styling purposes
     <div className={classN}>
       {/* Define your routes here */}
       <Routes>
@@ -39,7 +37,7 @@ function App({ classN }: { classN: string }) {
             <Route path="/deals/new" element={<NewDeal />} />
             <Route path="/deals/:dealId/edit" element={<EditDeal />} />
             <Route path="/deals/archived" element={<ArchivedDeals />} />
-            {/*<Route path="/pipeline" element={<Pipeline />} />*/}
+            <Route path="/pipeline" element={<Pipeline />} />
             <Route path="/calculator" element={<Calculator />} />
           </Route>
         </Route>
