@@ -185,6 +185,9 @@ export default function Pipeline() {
   const [settings, setSettings] = useState<DeductionSettings>(DEFAULT_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
   const [overrides, setOverrides] = useState<Record<string, RowOverride>>({});
+  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>(
+    {},
+  );
 
   // Year navigation
   const today = new Date();
@@ -244,7 +247,26 @@ export default function Pipeline() {
   // Parse a ZAR-formatted string back to a number for totals/cashflow
   function parseZAR(str: string): number {
     if (!str) return 0;
-    return parseFloat(str.replace(/[^0-9.-]/g, "")) || 0;
+    const formatParts = new Intl.NumberFormat("en-ZA", {
+      style: "currency",
+      currency: "ZAR",
+    }).formatToParts(12345.6);
+    const groupSeparator =
+      formatParts.find((part) => part.type === "group")?.value ?? " ";
+    const decimalSeparator =
+      formatParts.find((part) => part.type === "decimal")?.value ?? ",";
+    const normalized = str
+      .split(groupSeparator)
+      .join("")
+      .replace(/[\s\u00a0\u202f]/g, "")
+      .replace(decimalSeparator, ".")
+      .replace(/[^0-9.-]/g, "");
+    const value = Number(normalized);
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  function toggleCard(dealId: string) {
+    setExpandedCards((prev) => ({ ...prev, [dealId]: !prev[dealId] }));
   }
 
   // Totals
@@ -424,12 +446,270 @@ export default function Pipeline() {
         </div>
       )}
 
-      {/* ── Main table ───────────────────────────────────────────────────── */}
+      {/* ── Deal cards — mobile & tablet (below lg) ─────────────────────── */}
       {filteredDeals.length > 0 && (
-        <div className="overflow-x-auto rounded-xl shadow-md">
-          <table className="w-full text-sm border-collapse min-w-225">
+        <div className="lg:hidden flex flex-col gap-3">
+          {filteredDeals.map((deal) => {
+            const ov = getOverride(deal.id);
+            const s = effectiveSettings(deal);
+            const breakdown = deal.purchasePrice
+              ? calculateNett(deal.purchasePrice, s)
+              : null;
+            const payeStr = breakdown
+              ? (breakdown.PAYE ?? breakdown.paye ?? "—")
+              : "—";
+            const nettStr = breakdown ? breakdown.nettPaymentToAgent : "—";
+            const isOpen = !!expandedCards[deal.id];
+
+            return (
+              <div
+                key={deal.id}
+                className="rounded-xl shadow-md bg-white overflow-hidden"
+              >
+                {/* Card header — always visible */}
+                <div className="p-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold truncate">
+                      {deal.propertyAddress}
+                    </p>
+                    <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-(--cl-base)/20 text-(--cl-base-dark)">
+                      {STAGE_LABELS[deal.currentStage] ??
+                        `Stage ${deal.currentStage}`}
+                    </span>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-xs text-(--cl-base)">Nett Comm</p>
+                    <p className="font-bold text-(--cl-accent) whitespace-nowrap">
+                      {nettStr}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Quick stats row */}
+                <div className="px-3 pb-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
+                  <div>
+                    <span className="text-(--cl-base)">Sales Price </span>
+                    <span className="font-medium">
+                      {formatZAR(deal.purchasePrice)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-(--cl-base)">My Split </span>
+                    <span className="font-medium">
+                      {deal.combinedAgentSplitPct.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Expand toggle */}
+                <button
+                  onClick={() => toggleCard(deal.id)}
+                  className="w-full px-3 py-2 text-sm font-medium border-t border-(--cl-base)/20 text-(--cl-base-dark) hover:bg-(--cl-base)/10 transition-colors flex items-center justify-center gap-1"
+                  aria-expanded={isOpen}
+                >
+                  {isOpen ? "Hide details" : "Show details"}
+                  <span
+                    className={`transition-transform ${isOpen ? "rotate-180" : ""}`}
+                  >
+                    ▾
+                  </span>
+                </button>
+
+                {/* Expanded details */}
+                {isOpen && (
+                  <div className="p-3 border-t border-(--cl-base)/20 bg-(--cl-white)/40 flex flex-col gap-3 text-sm">
+                    {/* Split breakdown */}
+                    {(deal.internalSplitPct !== 100 ||
+                      deal.externalSplitPct !== 100) && (
+                      <p className="text-xs text-(--cl-base)">
+                        {deal.internalSplitPct}% internal split ×{" "}
+                        {deal.externalSplitPct}% external split
+                      </p>
+                    )}
+
+                    {/* % Com + PAYE */}
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                      <label className="flex flex-col gap-0.5">
+                        <span className="text-xs text-(--cl-base)">% Com</span>
+                        <div className="flex items-center gap-0.5">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min={0}
+                            value={
+                              ov.commissionPct !== ""
+                                ? ov.commissionPct
+                                : (deal.expectedCommissionPct ??
+                                  settings.commissionPct)
+                            }
+                            onChange={(e) =>
+                              setOverrideField(
+                                deal.id,
+                                "commissionPct",
+                                e.target.value,
+                              )
+                            }
+                            className={inputCls}
+                            aria-label="Commission %"
+                          />
+                          <span>%</span>
+                        </div>
+                      </label>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs text-(--cl-base)">
+                          PAYE @{settings.payePct}%
+                        </span>
+                        <span className="font-medium text-(--cl-accent-dark)">
+                          {payeStr}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Agent / company */}
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                      <div>
+                        <span className="text-xs text-(--cl-base) block">
+                          Listing Agent
+                        </span>
+                        {deal.agentFullName ?? "—"}
+                      </div>
+                      <div>
+                        <span className="text-xs text-(--cl-base) block">
+                          Company
+                        </span>
+                        <span className="text-(--cl-base)">
+                          {deal.listingCompany}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Dates */}
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                      <div>
+                        <span className="text-xs text-(--cl-base) block">
+                          Listing Date
+                        </span>
+                        {formatDate(deal.listingDate)}
+                      </div>
+                      <div>
+                        <span className="text-xs text-(--cl-base) block">
+                          Sale Date
+                        </span>
+                        {formatDate(deal.expectedCloseDate)}
+                      </div>
+                      <div>
+                        <span className="text-xs text-(--cl-base) block">
+                          DOM
+                        </span>
+                        {domDays(deal.listingDate, deal.expectedCloseDate)}
+                      </div>
+                      <label className="flex flex-col gap-0.5">
+                        <span className="text-xs text-(--cl-base)">
+                          Lodge Date
+                        </span>
+                        <input
+                          type="date"
+                          value={ov.lodgeDate}
+                          onChange={(e) =>
+                            setOverrideField(
+                              deal.id,
+                              "lodgeDate",
+                              e.target.value,
+                            )
+                          }
+                          className={inputCls}
+                          aria-label="Lodge date"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-0.5">
+                        <span className="text-xs text-(--cl-base)">
+                          Reg Date
+                        </span>
+                        <input
+                          type="date"
+                          value={ov.regDate}
+                          onChange={(e) =>
+                            setOverrideField(deal.id, "regDate", e.target.value)
+                          }
+                          className={inputCls}
+                          aria-label="Reg date"
+                        />
+                      </label>
+                    </div>
+
+                    {/* Clients */}
+                    <div>
+                      <span className="text-xs text-(--cl-base) block mb-0.5">
+                        Clients
+                      </span>
+                      {deal.clients.length > 0 ? (
+                        <ul className="space-y-0.5">
+                          {deal.clients.map((c, ci) => (
+                            <li key={ci}>
+                              <span className="text-xs text-(--cl-base) capitalize mr-1">
+                                [{c.role}]
+                              </span>
+                              {c.name}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <span className="text-(--cl-base)">—</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Mobile totals summary */}
+          <div className="rounded-xl bg-(--cl-base-dark) text-(--cl-white) p-3 flex items-center justify-between">
+            <span className="text-sm font-semibold uppercase tracking-wide">
+              Total nett ({filteredDeals.length} deal
+              {filteredDeals.length === 1 ? "" : "s"})
+            </span>
+            <span className="font-bold text-lg">{formatZAR(totalNett)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Main table — desktop/large screens (lg and up) ──────────────── */}
+      {filteredDeals.length > 0 && (
+        <div className="hidden lg:block overflow-x-auto rounded-xl shadow-md relative">
+          <table className="w-full text-sm border-collapse min-w-275">
             <thead>
               <tr className="bg-(--cl-base-dark) text-(--cl-white)">
+                {/* PROPERTY — sticky so it stays in view while scrolling */}
+                <th className="sticky left-0 z-20 bg-(--cl-base-dark) px-3 py-2 text-left font-semibold">
+                  Address
+                </th>
+                {/* STATUS */}
+                <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">
+                  Stage
+                </th>
+                {/* FINANCIALS — most-used figures come first */}
+                <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">
+                  Sales Price
+                </th>
+                <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">
+                  % Com
+                </th>
+                <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">
+                  My Split
+                </th>
+                <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">
+                  PAYE @{settings.payePct}%
+                </th>
+                <th className="px-3 py-2 text-right font-semibold whitespace-nowrap bg-(--cl-accent) text-white">
+                  Nett Comm
+                </th>
+                <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">
+                  Listing Agent
+                </th>
+                <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">
+                  Company
+                </th>
                 {/* DATES */}
                 <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">
                   Listing Date
@@ -445,34 +725,6 @@ export default function Pipeline() {
                 </th>
                 <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">
                   Reg Date
-                </th>
-                {/* PROPERTY */}
-                <th className="px-3 py-2 text-left font-semibold">Address</th>
-                {/* STATUS */}
-                <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">
-                  Stage
-                </th>
-                {/* FINANCIALS */}
-                <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">
-                  Listing Agent
-                </th>
-                <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">
-                  Company
-                </th>
-                <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">
-                  Sales Price
-                </th>
-                <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">
-                  % Com
-                </th>
-                <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">
-                  My Split
-                </th>
-                <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">
-                  PAYE @{settings.payePct}%
-                </th>
-                <th className="px-3 py-2 text-right font-semibold whitespace-nowrap bg-(--cl-accent) text-white">
-                  Nett Comm
                 </th>
                 {/* CLIENTS */}
                 <th className="px-3 py-2 text-left font-semibold">Clients</th>
@@ -498,49 +750,10 @@ export default function Pipeline() {
                     key={deal.id}
                     className={`${rowBg} hover:bg-(--cl-base)/10 transition-colors`}
                   >
-                    {/* Listing date */}
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {formatDate(deal.listingDate)}
-                    </td>
-
-                    {/* Sale date (expectedCloseDate) */}
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {formatDate(deal.expectedCloseDate)}
-                    </td>
-
-                    {/* DOM */}
-                    <td className="px-3 py-2 whitespace-nowrap text-center">
-                      {domDays(deal.listingDate, deal.expectedCloseDate)}
-                    </td>
-
-                    {/* Lodge date — editable */}
-                    <td className="px-3 py-2">
-                      <input
-                        type="date"
-                        value={ov.lodgeDate}
-                        onChange={(e) =>
-                          setOverrideField(deal.id, "lodgeDate", e.target.value)
-                        }
-                        className={inputCls}
-                        aria-label="Lodge date"
-                      />
-                    </td>
-
-                    {/* Reg date — editable */}
-                    <td className="px-3 py-2">
-                      <input
-                        type="date"
-                        value={ov.regDate}
-                        onChange={(e) =>
-                          setOverrideField(deal.id, "regDate", e.target.value)
-                        }
-                        className={inputCls}
-                        aria-label="Reg date"
-                      />
-                    </td>
-
-                    {/* Address */}
-                    <td className="px-3 py-2 font-medium">
+                    {/* Address — sticky */}
+                    <td
+                      className={`sticky left-0 z-10 ${rowBg} px-3 py-2 font-medium`}
+                    >
                       {deal.propertyAddress}
                     </td>
 
@@ -550,16 +763,6 @@ export default function Pipeline() {
                         {STAGE_LABELS[deal.currentStage] ??
                           `Stage ${deal.currentStage}`}
                       </span>
-                    </td>
-
-                    {/* Listing agent */}
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {deal.agentFullName ?? "—"}
-                    </td>
-
-                    {/* Company */}
-                    <td className="px-3 py-2 whitespace-nowrap text-(--cl-base)">
-                      {deal.listingCompany}
                     </td>
 
                     {/* Sales price */}
@@ -616,6 +819,57 @@ export default function Pipeline() {
                       {nettStr}
                     </td>
 
+                    {/* Listing agent */}
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {deal.agentFullName ?? "—"}
+                    </td>
+
+                    {/* Company */}
+                    <td className="px-3 py-2 whitespace-nowrap text-(--cl-base)">
+                      {deal.listingCompany}
+                    </td>
+
+                    {/* Listing date */}
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {formatDate(deal.listingDate)}
+                    </td>
+
+                    {/* Sale date (expectedCloseDate) */}
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {formatDate(deal.expectedCloseDate)}
+                    </td>
+
+                    {/* DOM */}
+                    <td className="px-3 py-2 whitespace-nowrap text-center">
+                      {domDays(deal.listingDate, deal.expectedCloseDate)}
+                    </td>
+
+                    {/* Lodge date — editable */}
+                    <td className="px-3 py-2">
+                      <input
+                        type="date"
+                        value={ov.lodgeDate}
+                        onChange={(e) =>
+                          setOverrideField(deal.id, "lodgeDate", e.target.value)
+                        }
+                        className={inputCls}
+                        aria-label="Lodge date"
+                      />
+                    </td>
+
+                    {/* Reg date — editable */}
+                    <td className="px-3 py-2">
+                      <input
+                        type="date"
+                        value={ov.regDate}
+                        onChange={(e) =>
+                          setOverrideField(deal.id, "regDate", e.target.value)
+                        }
+                        className={inputCls}
+                        aria-label="Reg date"
+                      />
+                    </td>
+
                     {/* Clients */}
                     <td className="px-3 py-2">
                       {deal.clients.length > 0 ? (
@@ -641,12 +895,10 @@ export default function Pipeline() {
             {/* Totals row */}
             <tfoot>
               <tr className="bg-(--cl-base-dark) text-(--cl-white) font-semibold">
-                <td
-                  colSpan={10}
-                  className="px-3 py-2 text-right text-xs uppercase tracking-wide"
-                >
+                <td className="sticky left-0 z-10 bg-(--cl-base-dark) px-3 py-2 text-right text-xs uppercase tracking-wide">
                   Total
                 </td>
+                <td />
                 <td className="px-3 py-2 text-right">
                   {formatZAR(
                     filteredDeals.reduce(
@@ -671,7 +923,7 @@ export default function Pipeline() {
                 <td className="px-3 py-2 text-right bg-(--cl-accent)">
                   {formatZAR(totalNett)}
                 </td>
-                <td />
+                <td colSpan={9} />
               </tr>
             </tfoot>
           </table>
@@ -684,7 +936,33 @@ export default function Pipeline() {
           <h2 className="text-xl font-semibold mb-3 text-(--cl-base-dark)">
             Cashflow forecast — {bounds.label}
           </h2>
-          <div className="overflow-x-auto rounded-xl shadow-md">
+          {/* Mobile/tablet — scrollable grid of month cards, no table needed */}
+          <div className="md:hidden grid grid-cols-3 sm:grid-cols-4 gap-2">
+            {cashflowByMonth.map((v, i) => (
+              <div
+                key={i}
+                className={`rounded-lg p-2.5 text-center ${
+                  v > 0 ? "bg-white shadow-sm" : "bg-(--cl-white)/50"
+                }`}
+              >
+                <p className="text-xs text-(--cl-base)">{cashflowHeaders[i]}</p>
+                <p
+                  className={`text-sm font-semibold whitespace-nowrap ${
+                    v > 0 ? "text-(--cl-accent)" : "text-(--cl-base)"
+                  }`}
+                >
+                  {v > 0 ? formatZAR(v) : "R 0"}
+                </p>
+              </div>
+            ))}
+            <div className="col-span-3 sm:col-span-4 rounded-lg p-2.5 text-center bg-(--cl-base-dark) text-(--cl-white)">
+              <p className="text-xs uppercase tracking-wide">Total</p>
+              <p className="font-bold">{formatZAR(totalNett)}</p>
+            </div>
+          </div>
+
+          {/* Desktop — full table */}
+          <div className="hidden md:block overflow-x-auto rounded-xl shadow-md">
             <table className="w-full text-sm border-collapse min-w-175">
               <thead>
                 <tr className="bg-(--cl-base) text-white">
