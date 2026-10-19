@@ -29,7 +29,9 @@ export type PipelineDeal = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function derivedStage(tasks: { column: string; stage: number }[]): number {
+function derivedStage(
+  tasks: { column: string; stage: number | null }[],
+): number {
   const doneStages = tasks
     .filter((t) => t.column === "done" && t.stage != null)
     .map((t) => Number(t.stage));
@@ -80,10 +82,15 @@ export async function getPipelineDeals(): Promise<PipelineDeal[]> {
 
   for (const deal of data ?? []) {
     const tasks =
-      (deal.workflow_boards as any[])?.flatMap(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (b: any) => b.workflow_tasks ?? [],
-      ) ?? [];
+      (
+        deal.workflow_boards as
+          | {
+              workflow_tasks?:
+                | { column: string; stage: number | null }[]
+                | null;
+            }[]
+          | null
+      )?.flatMap((board) => board.workflow_tasks ?? []) ?? [];
 
     const stage = derivedStage(tasks);
     if (stage < 3) continue;
@@ -107,9 +114,12 @@ export async function getPipelineDeals(): Promise<PipelineDeal[]> {
       currentStage: stage,
       agentFullName: myAgentRow?.profiles?.full_name ?? null,
       listingCompany: "RE/MAX Unity",
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       clients:
-        (deal.deal_clients as any[])?.map((dc: any) => ({
+        (
+          deal.deal_clients as
+            | { role: string; clients: { name: string | null } | null }[]
+            | null
+        )?.map((dc) => ({
           name: dc.clients?.name ?? "(unnamed)",
           role: dc.role as "seller" | "buyer",
         })) ?? [],
