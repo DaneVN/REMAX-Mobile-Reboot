@@ -12,13 +12,20 @@ export type PipelineClient = {
 export type PipelineDeal = {
   id: string;
   propertyAddress: string;
-  area: string | null;
   listingDate: string | null; // ISO date — deals.created_at
   expectedCloseDate: string | null; // proxy for Sale Date — deals.expected_close_date
   purchasePrice: number | null;
   listingPrice: number | null;
   expectedCommissionPct: number | null; // % excl. VAT
-  myInternalSplitPct: number; // deal_agents.commission_split_pct for current user
+  // Two separate splits can reduce what reaches this agent:
+  internalSplitPct: number; // deal_agents.commission_split_pct — split with the OTHER
+  // Unity agent working this deal with you (default 100 = sole agent)
+  externalSplitPct: number; // deals.commission_split_pct — split between Unity (office)
+  // and an EXTERNAL agency's agent on this deal (default 100 =
+  // no external agent, Unity keeps the full commission)
+  combinedAgentSplitPct: number; // internalSplitPct × externalSplitPct / 100 — the effective
+  // % of the deal's total commission that reaches this agent,
+  // BEFORE the Unity office split (royalty/unitySplit) is applied
   currentStage: number; // 1-7
   agentFullName: string | null;
   listingCompany: string; // always "RE/MAX Unity" for now
@@ -59,6 +66,7 @@ export async function getPipelineDeals(): Promise<PipelineDeal[]> {
       purchase_price,
       listing_price,
       expected_commission,
+      commission_split_pct,
       deal_agents (
         agent_id,
         commission_split_pct,
@@ -101,16 +109,21 @@ export async function getPipelineDeals(): Promise<PipelineDeal[]> {
       (a: any) => a.agent_id === user.id,
     );
 
+    const internalSplitPct = myAgentRow?.commission_split_pct ?? 100;
+    const externalSplitPct = deal.commission_split_pct ?? 100;
+    const combinedAgentSplitPct = (internalSplitPct * externalSplitPct) / 100;
+
     results.push({
       id: deal.id,
       propertyAddress: deal.property_address ?? "",
-      area: null, // not a DB column yet — left for manual entry / future schema
       listingDate: deal.created_at ? deal.created_at.split("T")[0] : null,
       expectedCloseDate: deal.expected_close_date ?? null,
       purchasePrice: deal.purchase_price ?? null,
       listingPrice: deal.listing_price ?? null,
       expectedCommissionPct: deal.expected_commission ?? null,
-      myInternalSplitPct: myAgentRow?.commission_split_pct ?? 100,
+      internalSplitPct,
+      externalSplitPct,
+      combinedAgentSplitPct,
       currentStage: stage,
       agentFullName: myAgentRow?.profiles?.full_name ?? null,
       listingCompany: "RE/MAX Unity",

@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { getPipelineDeals, type PipelineDeal } from "../../lib/pipeline";
+import { AgentCommission } from "../utils/CommissionCalculator";
+import type { CalculatorData } from "../components/Calculator/CalculatorCard";
 
 // ---------------------------------------------------------------------------
 // Constants & Helpers
 // ---------------------------------------------------------------------------
 
-const VAT = 15 / 100;
 const SA_FY_START_MONTH = 2; // March = index 2 in JS Date (0-indexed)
 
 const STAGE_LABELS: Record<number, string> = {
@@ -54,56 +55,35 @@ function domDays(listing: string | null, sale: string | null): string {
 }
 
 // ---------------------------------------------------------------------------
-// Commission calculation (mirrors CommissionCalculator.js)
+// Deduction settings (agent-wide defaults, editable via settings panel)
 // ---------------------------------------------------------------------------
 
 type DeductionSettings = {
   commissionPct: number; // % excl. VAT on purchase price
-  agentInternalSplitPct: number; // agent's internal split with co-agent
+  agentSplitPct: number; // the agent's COMBINED split of total commission — internal
+  // co-agent split × external agency split (see PipelineDeal.combinedAgentSplitPct)
   royaltyPct: number;
-  officeSplitPct: number; // the AGENT's share after Unity split, e.g. 50 means 50|50
+  officeSplitPct: number; // agent's share of the Unity office split %, e.g. 50 for 50|50 —
+  // a SEPARATE deduction from agentSplitPct, applied after VAT/royalty
   payePct: number;
 };
 
-type CommissionBreakdown = {
-  grossCommission: number;
-  lessVat: number;
-  totalAfterVat: number;
-  lessRoyalty: number;
-  totalAfterRoyalty: number;
-  agentShareAfterOfficeSplit: number;
-  lessPaye: number;
-  nettPayment: number;
-};
-
-function calculateNett(
-  purchasePrice: number,
-  settings: DeductionSettings,
-): CommissionBreakdown {
-  const vatOnComm = settings.commissionPct * (VAT + 1);
-  const commFactor = (vatOnComm / 100) * (settings.agentInternalSplitPct / 100);
-  const grossCommission = purchasePrice * commFactor;
-  const lessVat =
-    grossCommission - parseFloat((grossCommission / (1 + VAT)).toFixed(2));
-  const totalAfterVat = grossCommission - lessVat;
-  const lessRoyalty = totalAfterVat * (settings.royaltyPct / 100);
-  const totalAfterRoyalty = totalAfterVat - lessRoyalty;
-  // officeSplitPct = agent's %; e.g. 50 means agent keeps 50%
-  const agentShareAfterOfficeSplit =
-    totalAfterVat * (settings.officeSplitPct / 100) - lessRoyalty;
-  const lessPaye = agentShareAfterOfficeSplit * (settings.payePct / 100);
-  const nettPayment = agentShareAfterOfficeSplit - lessPaye;
-
-  return {
-    grossCommission,
-    lessVat,
-    totalAfterVat,
-    lessRoyalty,
-    totalAfterRoyalty,
-    agentShareAfterOfficeSplit,
-    lessPaye,
-    nettPayment,
+// Build a CalculatorData object and run it through the canonical AgentCommission function.
+// unitySplit in CalculatorData = the Unity office split (a separate % from agentSplit),
+// matching the Calculator's "Unity Office Split" field.
+function calculateNett(purchasePrice: number, settings: DeductionSettings) {
+  const data: CalculatorData = {
+    purchasePrice,
+    commissionOnPurchasePrice: settings.commissionPct,
+    agentSplit: settings.agentSplitPct,
+    vatOnAgentSplit: "excl.",
+    grossCommision: 0, // use purchase-price path
+    vat: 15,
+    royalty: settings.royaltyPct,
+    unitySplit: settings.officeSplitPct,
+    paye: settings.payePct,
   };
+  return AgentCommission(data);
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +157,6 @@ function getCashflowHeaders(yearType: YearType): string[] {
 type RowOverride = {
   lodgeDate: string;
   regDate: string;
-  area: string;
   commissionPct: string;
 };
 
@@ -187,7 +166,7 @@ type RowOverride = {
 
 const DEFAULT_SETTINGS: DeductionSettings = {
   commissionPct: 5,
-  agentInternalSplitPct: 100,
+  agentSplitPct: 100,
   royaltyPct: 1.5,
   officeSplitPct: 50,
   payePct: 18,
@@ -225,7 +204,10 @@ export default function Pipeline() {
     isInYear(d.expectedCloseDate, bounds),
   );
 
-  // Per-deal effective settings (use row override commissionPct if set)
+  // Per-deal effective settings (use row override commissionPct if set).
+  // agentSplitPct is fed the deal's COMBINED split — internal co-agent split ×
+  // external agency split — not just the internal split, since both reduce
+  // what reaches this agent before the Unity office split applies.
   function effectiveSettings(deal: PipelineDeal): DeductionSettings {
     const ov = overrides[deal.id];
     const commPct = ov?.commissionPct
@@ -234,7 +216,7 @@ export default function Pipeline() {
     return {
       ...settings,
       commissionPct: isNaN(commPct) ? settings.commissionPct : commPct,
-      agentInternalSplitPct: deal.myInternalSplitPct,
+      agentSplitPct: deal.combinedAgentSplitPct,
     };
   }
 
@@ -243,7 +225,6 @@ export default function Pipeline() {
       overrides[dealId] ?? {
         lodgeDate: "",
         regDate: "",
-        area: "",
         commissionPct: "",
       }
     );
@@ -260,11 +241,17 @@ export default function Pipeline() {
     }));
   }
 
+  // Parse a ZAR-formatted string back to a number for totals/cashflow
+  function parseZAR(str: string): number {
+    if (!str) return 0;
+    return parseFloat(str.replace(/[^0-9.-]/g, "")) || 0;
+  }
+
   // Totals
   const totalNett = filteredDeals.reduce((sum, d) => {
     if (!d.purchasePrice) return sum;
-    const s = effectiveSettings(d);
-    return sum + calculateNett(d.purchasePrice, s).nettPayment;
+    const result = calculateNett(d.purchasePrice, effectiveSettings(d));
+    return sum + parseZAR(result.nettPaymentToAgent);
   }, 0);
 
   // Cashflow: nett by month index
@@ -273,11 +260,8 @@ export default function Pipeline() {
     if (!d.purchasePrice) return;
     const idx = cashflowMonthIndex(d.expectedCloseDate, yearType);
     if (idx == null) return;
-    const nett = calculateNett(
-      d.purchasePrice,
-      effectiveSettings(d),
-    ).nettPayment;
-    cashflowByMonth[idx] += nett;
+    const result = calculateNett(d.purchasePrice, effectiveSettings(d));
+    cashflowByMonth[idx] += parseZAR(result.nettPaymentToAgent);
   });
 
   // Year navigation
@@ -464,7 +448,6 @@ export default function Pipeline() {
                 </th>
                 {/* PROPERTY */}
                 <th className="px-3 py-2 text-left font-semibold">Address</th>
-                <th className="px-3 py-2 text-left font-semibold">Area</th>
                 {/* STATUS */}
                 <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">
                   Stage
@@ -503,6 +486,11 @@ export default function Pipeline() {
                 const breakdown = deal.purchasePrice
                   ? calculateNett(deal.purchasePrice, s)
                   : null;
+                // AgentCommission returns ZAR-formatted strings
+                const payeStr = breakdown
+                  ? (breakdown.PAYE ?? breakdown.paye ?? "—")
+                  : "—";
+                const nettStr = breakdown ? breakdown.nettPaymentToAgent : "—";
                 const rowBg = i % 2 === 0 ? "bg-white" : "bg-(--cl-white)/60";
 
                 return (
@@ -556,20 +544,6 @@ export default function Pipeline() {
                       {deal.propertyAddress}
                     </td>
 
-                    {/* Area — editable */}
-                    <td className="px-3 py-2">
-                      <input
-                        type="text"
-                        value={ov.area}
-                        onChange={(e) =>
-                          setOverrideField(deal.id, "area", e.target.value)
-                        }
-                        placeholder="Area"
-                        className={inputCls}
-                        aria-label="Area"
-                      />
-                    </td>
-
                     {/* Stage */}
                     <td className="px-3 py-2 whitespace-nowrap">
                       <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-(--cl-base)/20 text-(--cl-base-dark)">
@@ -620,19 +594,26 @@ export default function Pipeline() {
                       </div>
                     </td>
 
-                    {/* My split (internal agent split %) */}
+                    {/* My split — combined internal (co-agent) × external (agency) split */}
                     <td className="px-3 py-2 text-right whitespace-nowrap">
-                      {deal.myInternalSplitPct}%
+                      <div>{deal.combinedAgentSplitPct.toFixed(1)}%</div>
+                      {(deal.internalSplitPct !== 100 ||
+                        deal.externalSplitPct !== 100) && (
+                        <div className="text-xs text-(--cl-base)">
+                          {deal.internalSplitPct}% int. ×{" "}
+                          {deal.externalSplitPct}% ext.
+                        </div>
+                      )}
                     </td>
 
                     {/* PAYE amount */}
                     <td className="px-3 py-2 text-right whitespace-nowrap text-(--cl-accent-dark)">
-                      {breakdown ? formatZAR(breakdown.lessPaye) : "—"}
+                      {payeStr}
                     </td>
 
                     {/* Nett commission — highlighted */}
                     <td className="px-3 py-2 text-right whitespace-nowrap font-bold text-(--cl-accent)">
-                      {breakdown ? formatZAR(breakdown.nettPayment) : "—"}
+                      {nettStr}
                     </td>
 
                     {/* Clients */}
@@ -679,11 +660,11 @@ export default function Pipeline() {
                   {formatZAR(
                     filteredDeals.reduce((s, d) => {
                       if (!d.purchasePrice) return s;
-                      return (
-                        s +
-                        calculateNett(d.purchasePrice, effectiveSettings(d))
-                          .lessPaye
+                      const r = calculateNett(
+                        d.purchasePrice,
+                        effectiveSettings(d),
                       );
+                      return s + parseZAR(r.PAYE ?? r.paye ?? "0");
                     }, 0),
                   )}
                 </td>
