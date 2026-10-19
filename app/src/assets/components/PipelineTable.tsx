@@ -1,5 +1,3 @@
-import React from "react";
-
 export default function PipelineTable() {
   // Sample Data
   const data = [
