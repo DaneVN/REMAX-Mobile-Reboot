@@ -316,7 +316,7 @@ export default function Pipeline() {
   return (
     <div className="text-(--cl-base-dark)">
       {/* ── Page header ──────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+      <div className="flex flex-wrap items-center justify-around gap-3 mb-5">
         <h1 className="text-3xl font-bold text-(--cl-base-dark)">
           Commission Pipeline
         </h1>
@@ -676,8 +676,8 @@ export default function Pipeline() {
 
       {/* ── Main table — desktop/large screens (lg and up) ──────────────── */}
       {filteredDeals.length > 0 && (
-        <div className="hidden lg:block overflow-x-auto rounded-xl shadow-md relative">
-          <table className="w-full text-sm border-collapse min-w-275">
+        <div className="hidden lg:block overflow-x-auto rounded-xl shadow-md relative overflow-scroll w-[95vw]">
+          <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-(--cl-base-dark) text-(--cl-white)">
                 {/* PROPERTY — sticky so it stays in view while scrolling */}
@@ -962,8 +962,8 @@ export default function Pipeline() {
           </div>
 
           {/* Desktop — full table */}
-          <div className="hidden md:block overflow-x-auto rounded-xl shadow-md">
-            <table className="w-full text-sm border-collapse min-w-175">
+          <div className="hidden md:block overflow-x-auto rounded-xl shadow-md overflow-scroll w-[95vw]">
+            <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-(--cl-base) text-white">
                   {cashflowHeaders.map((m) => (
