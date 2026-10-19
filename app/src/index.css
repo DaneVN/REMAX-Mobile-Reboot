@@ -116,6 +116,16 @@ textarea {
   padding: 2pt;
 }
 
+th,
+td {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  line-height: 135%;
+  padding: 0.5rem;
+  text-align: center;
+  align-content: start;
+}
+
 /* code,
 .counter {
   font-family: var(--mono);
