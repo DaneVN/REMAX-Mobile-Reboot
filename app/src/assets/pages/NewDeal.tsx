@@ -56,7 +56,12 @@ function NewDeal() {
   const [listingPrice, setListingPrice] = useState("");
   const [purchasePrice, setPurchasePrice] = useState("");
   const [expectedCommission, setExpectedCommission] = useState("");
-  const [expectedCloseDate, setExpectedCloseDate] = useState("");
+  //expected close date is 3 months from now by default, but can be changed by user
+  const [expectedCloseDate, setExpectedCloseDate] = useState(
+    new Date(new Date().setMonth(new Date().getMonth() + 3))
+      .toISOString()
+      .split("T")[0],
+  );
 
   const [agentDirectory, setAgentDirectory] = useState<AgentDirectoryEntry[]>(
     [],
@@ -69,6 +74,7 @@ function NewDeal() {
 
   useEffect(() => {
     let cancelled = false;
+
     listAllAgents()
       .then((data) => {
         if (cancelled) return;
