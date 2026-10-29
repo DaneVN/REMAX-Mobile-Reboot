@@ -101,7 +101,7 @@ export async function getPipelineDeals(): Promise<PipelineDeal[]> {
       )?.flatMap((board) => board.workflow_tasks ?? []) ?? [];
 
     const stage = derivedStage(tasks);
-    if (stage < 1) continue;
+    if (stage < 3) continue;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const myAgentRow = (deal.deal_agents as any[])?.find(
