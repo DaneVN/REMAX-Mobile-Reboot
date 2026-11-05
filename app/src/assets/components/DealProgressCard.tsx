@@ -5,6 +5,7 @@ import {
   type DealProgress,
 } from "../../lib/deal_progress";
 import { getBoardTitle } from "../../lib/boardTitle";
+import { useUserRole } from "../../lib/useUserRole";
 
 const TOTAL_STAGES = 7;
 
@@ -19,6 +20,7 @@ const STAGE_LABELS: Record<number, string> = {
 };
 
 function DealProgressCard() {
+  const { isAdmin } = useUserRole();
   const [deals, setDeals] = useState<DealProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +106,7 @@ function DealProgressCard() {
 
                   <p className="text-xs mt-1 text-(--cl-dark-blue)/70">
                     {STAGE_LABELS[deal.currentStage]}
+                    {isAdmin && ` · Agent: ${deal.agentNames}`}
                   </p>
                 </Link>
               </li>

@@ -3,6 +3,14 @@ import { Link } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 import { restoreDeal } from "../../lib/deals";
 import { getBoardTitle } from "../../lib/boardTitle";
+import { useAuth } from "../../lib/AuthProvider";
+import { useUserRole } from "../../lib/useUserRole";
+import {
+  DEAL_AGENTS_EMBED,
+  agentNamesLabel,
+  isAssignedTo,
+  type DealAgentEmbed,
+} from "../../lib/dealAgentLabel";
 
 type ArchivedDeal = {
   id: string;
@@ -11,9 +19,16 @@ type ArchivedDeal = {
   status: string;
   representing: "seller" | "buyer" | "both";
   firstBuyerName: string | null;
+  agentNames: string;
+  // Admins are read-only on other agents' deals, so Restore is hidden unless
+  // the signed-in user is assigned to the deal.
+  isMine: boolean;
 };
 
 function ArchivedDeals() {
+  const { session } = useAuth();
+  const { isAdmin } = useUserRole();
+  const userId = session?.user.id;
   const [deals, setDeals] = useState<ArchivedDeal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +40,7 @@ function ArchivedDeals() {
     supabase
       .from("deals")
       .select(
-        "id, property_address, deal_type, status, representing, deal_clients ( role, clients ( name ) )",
+        `id, property_address, deal_type, status, representing, deal_clients ( role, clients ( name ) ), ${DEAL_AGENTS_EMBED}`,
       )
       .eq("is_deleted", true)
       .order("created_at", { ascending: false })
@@ -48,10 +63,15 @@ function ArchivedDeals() {
             deal_type: row.deal_type as "sale" | "rental",
             status: row.status,
             representing: (row.representing ?? "seller") as
-              | "seller"
-              | "buyer"
-              | "both",
+              "seller" | "buyer" | "both",
             firstBuyerName,
+            agentNames: agentNamesLabel(
+              (row as unknown as { deal_agents: DealAgentEmbed[] }).deal_agents,
+            ),
+            isMine: isAssignedTo(
+              (row as unknown as { deal_agents: DealAgentEmbed[] }).deal_agents,
+              userId,
+            ),
           };
         });
         setDeals(mapped);
@@ -62,7 +82,7 @@ function ArchivedDeals() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [userId]);
 
   async function handleRestore(dealId: string) {
     setError(null);
@@ -109,17 +129,24 @@ function ArchivedDeals() {
               )}
             </p>{" "}
             <p className="text-sm capitalize">
-              {deal.deal_type} · {deal.status}
+              {deal.deal_type} · {deal.status.replace("_", " ")}
             </p>
+            {isAdmin && (
+              <p className="text-sm">
+                <span className="font-semibold">Agent:</span> {deal.agentNames}
+              </p>
+            )}
           </div>
 
-          <button
-            onClick={() => handleRestore(deal.id)}
-            disabled={restoringId === deal.id}
-            className="px-3 py-1 rounded bg-(--cl-accent) text-(--cl-white)"
-          >
-            {restoringId === deal.id ? "Restoring…" : "Restore"}
-          </button>
+          {deal.isMine && (
+            <button
+              onClick={() => handleRestore(deal.id)}
+              disabled={restoringId === deal.id}
+              className="px-3 py-1 rounded bg-(--cl-accent) text-(--cl-white)"
+            >
+              {restoringId === deal.id ? "Restoring…" : "Restore"}
+            </button>
+          )}
         </div>
       ))}
     </div>

@@ -1,4 +1,9 @@
 import { supabase } from "./supabaseClient";
+import {
+  DEAL_AGENTS_EMBED,
+  agentNamesLabel,
+  type DealAgentEmbed,
+} from "./dealAgentLabel";
 
 export type DealProgress = {
   dealId: string;
@@ -6,6 +11,7 @@ export type DealProgress = {
   representing: "seller" | "buyer" | "both";
   firstBuyerName: string | null;
   currentStage: number;
+  agentNames: string; // only meaningful for admins (see dealAgentLabel.ts)
 };
 
 export async function getActiveDealsProgress(): Promise<DealProgress[]> {
@@ -17,6 +23,7 @@ export async function getActiveDealsProgress(): Promise<DealProgress[]> {
       property_address,
       representing,
       deal_clients ( role, clients ( name ) ),
+      ${DEAL_AGENTS_EMBED},
       workflow_boards (
         workflow_tasks ( stage, column )
       )
@@ -45,11 +52,12 @@ export async function getActiveDealsProgress(): Promise<DealProgress[]> {
       dealId: deal.id,
       propertyAddress: deal.property_address,
       representing: (deal.representing ?? "seller") as
-        | "seller"
-        | "buyer"
-        | "both",
+        "seller" | "buyer" | "both",
       firstBuyerName,
       currentStage,
+      agentNames: agentNamesLabel(
+        (deal as unknown as { deal_agents: DealAgentEmbed[] }).deal_agents,
+      ),
     };
   });
 }

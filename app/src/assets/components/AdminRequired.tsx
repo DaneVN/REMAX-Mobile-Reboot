@@ -1,35 +1,10 @@
-import { useEffect, useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../../lib/AuthProvider";
-import { supabase } from "../../lib/supabaseClient";
+import { useUserRole } from "../../lib/useUserRole";
 
 function AdminRequired() {
   const { session, loading: authLoading } = useAuth();
-  const [role, setRole] = useState<string | null>(null);
-  const [roleLoading, setRoleLoading] = useState(true);
-
-  useEffect(() => {
-    // No session yet — nothing to fetch. Render handles the redirect;
-    // no setState needed here, so no synchronous state update on mount.
-    if (!session) return;
-
-    let cancelled = false;
-
-    supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", session.user.id)
-      .single()
-      .then(({ data }) => {
-        if (cancelled) return; // component unmounted or session changed mid-request
-        setRole(data?.role ?? null);
-        setRoleLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [session]);
+  const { isAdmin, loading: roleLoading } = useUserRole();
 
   if (authLoading)
     return (
@@ -40,7 +15,7 @@ function AdminRequired() {
     return (
       <img src="/blocks-shuffle-3.svg" alt="Loading..." className="w-6 h-6" />
     );
-  if (role !== "admin") return <Navigate to="/" replace />;
+  if (!isAdmin) return <Navigate to="/" replace />;
 
   return <Outlet />;
 }

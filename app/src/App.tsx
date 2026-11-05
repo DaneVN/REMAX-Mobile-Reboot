@@ -7,12 +7,12 @@ import EditDeal from "./assets/pages/EditDeal";
 import ArchivedDeals from "./assets/pages/ArchivedDeals";
 import Pipeline from "./assets/pages/Pipeline";
 import Calculator from "./assets/pages/Calculator";
-// import Stats from "./assets/pages/Stats";
+import Stats from "./assets/pages/Stats";
 import AuthRequired from "./assets/components/AuthRequired";
 import Layout from "./assets/pages/Layout";
 import WorkflowIndex from "./assets/pages/WorkflowIndex";
 import AdminRequired from "./assets/components/AdminRequired";
-// import AdminRequired from "./assets/components/AdminRequired";
+import AgentOnly from "./assets/components/AgentOnly";
 
 /**
  * App component that serves as the root of the application. It sets up routing and applies a className for global styling.
@@ -37,14 +37,19 @@ function App({ classN }: { classN: string }) {
             <Route path="/deals/new" element={<NewDeal />} />
             <Route path="/deals/:dealId/edit" element={<EditDeal />} />
             <Route path="/deals/archived" element={<ArchivedDeals />} />
-            <Route path="/pipeline" element={<Pipeline />} />
+            {/* Pipeline is an agent's personal view -- admins are redirected Home */}
+            <Route element={<AgentOnly />}>
+              <Route path="/pipeline" element={<Pipeline />} />
+            </Route>
             <Route path="/calculator" element={<Calculator />} />
           </Route>
         </Route>
 
         {/* Routes below require a logged-in session AND role = 'admin' */}
         <Route element={<AdminRequired />}>
-          {/* <Route path="/stats" element={<Stats />} />  */}
+          <Route element={<Layout />}>
+            <Route path="/stats" element={<Stats />} />
+          </Route>
         </Route>
         <Route path="*" element={<div>404 Not Found</div>} />
       </Routes>

@@ -246,69 +246,6 @@ export async function deleteDealPermanently(dealId: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Agents assigned to a deal (multi-agent access). The creating agent is
-// auto-assigned by create_deal_with_board; these manage everyone after that.
-// ---------------------------------------------------------------------------
-
-export type DealAgent = {
-  id: string; // deal_agents row id
-  agentId: string;
-  fullName: string | null;
-};
-
-export async function getDealAgents(dealId: string): Promise<DealAgent[]> {
-  const { data, error } = await supabase
-    .from("deal_agents")
-    .select(
-      `
-      id,
-      agent_id,
-      profiles ( full_name )
-    `,
-    )
-    .eq("deal_id", dealId);
-
-  if (error) throw error;
-
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    agentId: row.agent_id,
-    fullName: row.profiles?.full_name ?? null,
-  }));
-}
-
-export async function addAgentToDeal(dealId: string, agentId: string) {
-  const { error } = await supabase
-    .from("deal_agents")
-    .insert({ deal_id: dealId, agent_id: agentId });
-
-  if (error) throw error;
-}
-
-export async function removeAgentFromDeal(dealAgentRowId: string) {
-  const { error } = await supabase
-    .from("deal_agents")
-    .delete()
-    .eq("id", dealAgentRowId);
-
-  if (error) throw error;
-}
-
-// For the "add a co-agent" picker -- every agent in the office, so the
-// current user can search/select a colleague to assign.
-export async function listAllAgents(): Promise<
-  { id: string; fullName: string | null }[]
-> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, full_name")
-    .order("full_name", { ascending: true });
-
-  if (error) throw error;
-  return (data ?? []).map((p) => ({ id: p.id, fullName: p.full_name }));
-}
-
-// ---------------------------------------------------------------------------
 // Persist who the agent represents on a deal.
 // Called when a second-side client is added and the agent confirms representation.
 // ---------------------------------------------------------------------------

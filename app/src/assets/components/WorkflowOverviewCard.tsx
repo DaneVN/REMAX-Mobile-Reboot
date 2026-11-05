@@ -3,6 +3,8 @@ import type { KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 import { getBoardTitle } from "../../lib/boardTitle";
+import { useUserRole } from "../../lib/useUserRole";
+import { agentNamesLabel, type DealAgentEmbed } from "../../lib/dealAgentLabel";
 
 interface WorkflowTask {
   id: string;
@@ -25,6 +27,7 @@ interface WorkflowTask {
       is_deleted: boolean | null;
       representing: "seller" | "buyer" | "both" | null;
       deal_clients: { role: string; clients: { name: string } | null }[];
+      deal_agents: DealAgentEmbed[];
     } | null;
   } | null;
 }
@@ -87,6 +90,7 @@ function groupTasksByTitle(tasks: WorkflowTask[]): [string, WorkflowTask[]][] {
 
 function WorkflowOverviewCard() {
   const navigate = useNavigate();
+  const { isAdmin } = useUserRole();
   const [tasks, setTasks] = useState<WorkflowTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -111,7 +115,8 @@ function WorkflowOverviewCard() {
               status,
               is_deleted,
               representing,
-              deal_clients ( role, clients ( name ) )
+              deal_clients ( role, clients ( name ) ),
+              deal_agents ( agent_id, profiles ( full_name ) )
             )
           )`,
         )
@@ -195,7 +200,11 @@ function WorkflowOverviewCard() {
         <div className="flex flex-col gap-3">
           {groupedTasks.map(([address, addressTasks]) => (
             <div key={address}>
-              <p className="text-sm font-semibold truncate mb-1">{address}</p>
+              <p className="text-sm font-semibold truncate mb-1">
+                {address}
+                {isAdmin &&
+                  ` · ${agentNamesLabel(addressTasks[0]?.workflow_boards?.deals?.deal_agents)}`}
+              </p>
               <ul className="flex flex-col gap-2">
                 {addressTasks.map((task) => {
                   const due = formatDueDate(task.due_date as string);

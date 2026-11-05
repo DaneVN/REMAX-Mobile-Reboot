@@ -12,6 +12,13 @@ import ConfirmDialog from "../components/ConfirmDialog";
 import { useNavigate } from "react-router-dom";
 import AddTaskModal from "../components/AddTaskModal";
 import { deleteTask } from "../../lib/workflow";
+import { useAuth } from "../../lib/AuthProvider";
+import {
+  DEAL_AGENTS_EMBED,
+  agentNamesLabel,
+  isAssignedTo,
+  type DealAgentEmbed,
+} from "../../lib/dealAgentLabel";
 
 type DealSummary = {
   id: string;
@@ -19,10 +26,12 @@ type DealSummary = {
   deal_type: string;
   status: string;
   representing: "seller" | "buyer" | "both";
+  deal_agents: DealAgentEmbed[];
 };
 
 function Workflow() {
   const { dealId } = useParams<{ dealId: string }>();
+  const { session } = useAuth();
   const [board, setBoard] = useState<WorkflowBoard | null>(null);
   const [deal, setDeal] = useState<DealSummary | null>(null);
   const [firstBuyerName, setFirstBuyerName] = useState<string | null>(null);
@@ -62,7 +71,9 @@ function Workflow() {
 
     supabase
       .from("deals")
-      .select("id, property_address, deal_type, status, representing")
+      .select(
+        `id, property_address, deal_type, status, representing, ${DEAL_AGENTS_EMBED}`,
+      )
       .eq("id", dealId)
       .single()
       .then(({ data, error }) => {
@@ -70,7 +81,7 @@ function Workflow() {
           console.error("Failed to fetch deals:", error);
           return;
         }
-        setDeal(data as DealSummary);
+        setDeal(data as unknown as DealSummary);
         setLoading(false);
       });
 
@@ -152,6 +163,11 @@ function Workflow() {
 
   const columns = groupTasksByColumn(board.workflow_tasks);
 
+  // Admins can open any deal but are read-only on deals they are not
+  // assigned to (RLS enforces it; this just hides the controls that would
+  // otherwise fail silently).
+  const canEdit = isAssignedTo(deal?.deal_agents, session?.user.id);
+
   function handleTaskAdded(newTask: WorkflowTask) {
     // Add to the board's task list
     setBoard((current) => {
@@ -180,26 +196,35 @@ function Workflow() {
               </p>
             )}
           </div>
-          <button
-            onClick={() => {
-              if (!dealId) {
-                console.error("Cannot edit deal: dealId is missing.");
-                return;
-              }
-              // Navigate to the deal edit page
-              navigate(`/deals/${dealId}/edit`);
-            }}
-            className="bg-(--cl-accent-dark) text-(--cl-white) py-2 px-4 rounded"
-          >
-            Edit Deal
-          </button>
+          {canEdit && (
+            <button
+              onClick={() => {
+                if (!dealId) {
+                  console.error("Cannot edit deal: dealId is missing.");
+                  return;
+                }
+                // Navigate to the deal edit page
+                navigate(`/deals/${dealId}/edit`);
+              }}
+              className="bg-(--cl-accent-dark) text-(--cl-white) py-2 px-4 rounded"
+            >
+              Edit Deal
+            </button>
+          )}
           {/* Add task button in footer */}
-          <button
-            onClick={() => setAddTaskOpen(true)}
-            className="bg-(--cl-base-dark) text-(--cl-white) px-4 py-2 rounded"
-          >
-            + Add Custom Task
-          </button>
+          {canEdit && (
+            <button
+              onClick={() => setAddTaskOpen(true)}
+              className="bg-(--cl-base-dark) text-(--cl-white) px-4 py-2 rounded"
+            >
+              + Add Custom Task
+            </button>
+          )}
+          {deal && !canEdit && (
+            <p className="col-span-full text-sm text-(--cl-dark-blue)/70">
+              Read-only view · Agent: {agentNamesLabel(deal.deal_agents)}
+            </p>
+          )}
 
           <AddTaskModal
             boardId={board?.id || ""}
@@ -227,12 +252,13 @@ function Workflow() {
                     task.column !== "done"
                       ? "bg-(--cl-accent-dark) text-(--cl-white)"
                       : "bg-(--cl-white) text-(--cl-dark-blue)") +
-                    " p-2 mb-2 rounded shadow hover:shadow-lg transition-shadow flex flex-col gap-1 cursor-pointer" +
+                    " p-2 mb-2 rounded shadow transition-shadow flex flex-col gap-1" +
+                    (canEdit ? " hover:shadow-lg cursor-pointer" : "") +
                     (taskIndex >= 3 && !expandedColumns[col]
                       ? " hidden md:flex"
                       : "")
                   }
-                  onClick={() => setSelectedTask(task)}
+                  onClick={canEdit ? () => setSelectedTask(task) : undefined}
                 >
                   <div>
                     <strong>{task.title}</strong>
@@ -311,7 +337,7 @@ function Workflow() {
                 console.error("Failed to mark deal as completed:", error);
               }
               setConfirmDialogOpen(false);
-              navigate("/workflow");
+              navigate("/workflow?status=closed");
             });
         }}
         onCancel={() => {

@@ -835,8 +835,16 @@ export default function Pipeline() {
                     </td>
 
                     {/* Sale date (expectedCloseDate) */}
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {formatDate(deal.expectedCloseDate)}
+                    <td className="px-3 py-2">
+                      <input
+                        type="date"
+                        value={ov.regDate}
+                        onChange={(e) =>
+                          setOverrideField(deal.id, "regDate", e.target.value)
+                        }
+                        className={inputCls}
+                        aria-label="Reg date"
+                      />
                     </td>
 
                     {/* DOM */}
@@ -858,16 +866,8 @@ export default function Pipeline() {
                     </td>
 
                     {/* Reg date — editable */}
-                    <td className="px-3 py-2">
-                      <input
-                        type="date"
-                        value={ov.regDate}
-                        onChange={(e) =>
-                          setOverrideField(deal.id, "regDate", e.target.value)
-                        }
-                        className={inputCls}
-                        aria-label="Reg date"
-                      />
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {formatDate(deal.expectedCloseDate)}
                     </td>
 
                     {/* Clients */}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 import {
   updateDeal,
@@ -615,6 +615,23 @@ function EditDeal() {
     return (
       <div className="p-4">
         <p>This deal doesn't exist, or you don't have access to it.</p>
+      </div>
+    );
+
+  // Admins can open any deal but are read-only on deals they aren't assigned
+  // to (RLS blocks the writes; without this the form would look like it saved).
+  if (
+    !agentsLoading &&
+    agentErrors.length === 0 &&
+    session &&
+    !dealAgents.some((a) => a.agentId === session.user.id)
+  )
+    return (
+      <div className="p-4">
+        <p>You have read-only access to this deal.</p>
+        <Link to={`/workflow/${dealId}`} className="underline">
+          &larr; Back to the board
+        </Link>
       </div>
     );
 

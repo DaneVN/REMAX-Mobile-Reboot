@@ -1,6 +1,9 @@
 import { Link } from "react-router-dom";
+import { useUserRole } from "../../lib/useUserRole";
 
 function AppCard() {
+  const { isAdmin } = useUserRole();
+
   return (
     <div
       id="apps"
@@ -10,12 +13,22 @@ function AppCard() {
       <p>Quick access to your tools.</p>
       <ul className="grid grid-cols-2 gap-2 mt-4 md:auto-cols-auto place-self-center">
         <li>
-          <Link
-            to="/pipeline"
-            className="bg-(--cl-base) text-(--cl-base-dark) p-2 rounded shadow-md max-w-2xl items-center justify-center flex"
-          >
-            Pipeline
-          </Link>
+          {/* Admins have no personal pipeline; they get the team overview instead */}
+          {isAdmin ? (
+            <Link
+              to="/stats"
+              className="bg-(--cl-base) text-(--cl-base-dark) p-2 rounded shadow-md max-w-2xl items-center justify-center flex"
+            >
+              Team overview
+            </Link>
+          ) : (
+            <Link
+              to="/pipeline"
+              className="bg-(--cl-base) text-(--cl-base-dark) p-2 rounded shadow-md max-w-2xl items-center justify-center flex"
+            >
+              Pipeline
+            </Link>
+          )}
         </li>
         <li>
           <Link

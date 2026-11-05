@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../lib/AuthProvider";
+import { useUserRole } from "../../lib/useUserRole";
 import { supabase } from "../../lib/supabaseClient";
 import ConfirmDialog from "./ConfirmDialog";
 
 function Navbar() {
   const { session } = useAuth();
+  const { isAdmin } = useUserRole();
   const navigate = useNavigate();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -35,6 +37,7 @@ function Navbar() {
             <option value="/">Home</option>
             <option value="/workflow">Boards</option>
             <option value="/calculator">Calculator</option>
+            {isAdmin && <option value="/stats">Team</option>}
           </select>
           <div className="hidden sm:flex sm:space-x-6">
             <li>
@@ -61,6 +64,16 @@ function Navbar() {
                 Calculator
               </a>
             </li>
+            {isAdmin && (
+              <li>
+                <a
+                  href="/stats"
+                  className="hover:text-(--cl-accent) transition-colors duration-150"
+                >
+                  Team
+                </a>
+              </li>
+            )}
           </div>
 
           {/* User Section */}
