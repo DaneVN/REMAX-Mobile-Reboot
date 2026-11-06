@@ -37,6 +37,7 @@ function Navbar() {
             <option value="/">Home</option>
             <option value="/workflow">Boards</option>
             <option value="/calculator">Calculator</option>
+            {!isAdmin && <option value="/pipeline">Pipeline</option>}
             {isAdmin && <option value="/stats">Team</option>}
           </select>
           <div className="hidden sm:flex sm:space-x-6">
@@ -64,6 +65,16 @@ function Navbar() {
                 Calculator
               </a>
             </li>
+            {!isAdmin && (
+              <li>
+                <a
+                  href="/pipeline"
+                  className="hover:text-(--cl-accent) transition-colors duration-150"
+                >
+                  Pipeline
+                </a>
+              </li>
+            )}
             {isAdmin && (
               <li>
                 <a
