@@ -752,7 +752,11 @@ export default function Pipeline() {
                   >
                     {/* Address — sticky */}
                     <td
-                      className={`sticky left-0 z-10 ${rowBg} px-3 py-2 font-medium`}
+                      className={`sticky left-0 z-10 ${rowBg} px-3 py-2 font-medium hover:underline cursor-pointer`}
+                      onClick={() => {
+                        // Navigate to the deal's edit page
+                        window.location.href = `/deals/${deal.id}/edit`;
+                      }}
                     >
                       {deal.propertyAddress}
                     </td>
