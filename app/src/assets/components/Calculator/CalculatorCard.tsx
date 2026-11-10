@@ -1,5 +1,6 @@
 import { useState } from "react";
 import CalculatorResult from "./CalculatorResult";
+import { validateAmount, validatePercent } from "../../../lib/validators";
 
 export type CalculatorData = {
   purchasePrice: number;
@@ -35,10 +36,56 @@ export default function CalculatorCard() {
     initialCalculatorData,
   );
   const [hasFixedGrossAmount, setHasFixedGrossAmount] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
+
+    const raw = (name: string) => {
+      const v = formData.get(name);
+      return typeof v === "string" ? v : "";
+    };
+    const found: string[] = [];
+    const add = (msg: string | null) => msg && found.push(msg);
+
+    add(
+      validateAmount(raw("purchasePrice"), "Purchase price", {
+        required: true,
+      }),
+    );
+    if (
+      Number(raw("purchasePrice")) === 0 &&
+      raw("purchasePrice").trim() !== ""
+    )
+      found.push("Purchase price must be greater than 0.");
+    if (hasFixedGrossAmount) {
+      add(
+        validateAmount(raw("grossCommision"), "Gross commission", {
+          required: true,
+        }),
+      );
+      if (
+        Number(raw("grossCommision")) === 0 &&
+        raw("grossCommision").trim() !== ""
+      )
+        found.push("Gross commission must be greater than 0.");
+    } else {
+      add(
+        validatePercent(raw("commissionOnPurchasePrice"), "Commission %", {
+          required: true,
+        }),
+      );
+      add(
+        validatePercent(raw("agentSplit"), "% Commission to you", {
+          required: true,
+        }),
+      );
+    }
+    add(validatePercent(raw("paye"), "PAYE", { required: true }));
+
+    setErrors(found);
+    if (found.length > 0) return;
 
     setCalculatorData({
       ...initialCalculatorData,
@@ -66,7 +113,7 @@ export default function CalculatorCard() {
           Commission Calculator:
         </h3>
         <div className="flex flex-col items-center justify-center h-full">
-          <form onSubmit={handleSubmit} className="w-full max-w-2xl">
+          <form onSubmit={handleSubmit} noValidate className="w-full max-w-2xl">
             <div className="flex flex-col items-start justify-center gap-4">
               <label className="text-lg font-semibold">
                 Purchase Price:
@@ -108,6 +155,7 @@ export default function CalculatorCard() {
                     defaultValue={5}
                     step="0.01"
                     min={0}
+                    max={100}
                   />
                 </label>
                 <label className="text-lg font-semibold">
@@ -120,6 +168,7 @@ export default function CalculatorCard() {
                     type="number"
                     step="0.01"
                     min={0}
+                    max={100}
                   />
                 </label>
               </div>
@@ -129,7 +178,7 @@ export default function CalculatorCard() {
                   hasFixedGrossAmount ? "" : "hidden"
                 }`}
               >
-                Gross Commision:{" "}
+                Gross Commission (incl. VAT, your full amount):{" "}
                 <input
                   name="grossCommision"
                   step="0.01"
@@ -183,10 +232,23 @@ export default function CalculatorCard() {
                   className="mt-2 p-2 rounded border border-gray-300 w-11/12"
                   placeholder="..."
                   defaultValue={18}
+                  step="0.01"
                   min={0}
+                  max={100}
                 />{" "}
                 %
               </label>
+
+              {errors.length > 0 && (
+                <div
+                  role="alert"
+                  className="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-lg text-sm flex flex-col gap-1"
+                >
+                  {errors.map((err) => (
+                    <p key={err}>• {err}</p>
+                  ))}
+                </div>
+              )}
 
               <button
                 type="submit"

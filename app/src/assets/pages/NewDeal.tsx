@@ -10,7 +10,12 @@ import {
   type AgentDirectoryEntry,
 } from "../../lib/dealAgents";
 import AttorneyPicker from "../components/AttorneyPicker";
-import { isValidEmail, isValidPhone } from "../../lib/validators";
+import {
+  isValidEmail,
+  isValidPhone,
+  validateAmount,
+  validatePercent,
+} from "../../lib/validators";
 import ConfirmDialog from "../components/ConfirmDialog";
 import type { ExistingClient } from "../../lib/useDuplicateClientCheck";
 import { supabase } from "../../lib/supabaseClient";
@@ -235,6 +240,24 @@ function NewDeal() {
           );
       }
     }
+
+    const priceLabel =
+      representing === "seller"
+        ? "Listing price"
+        : representing === "buyer"
+          ? "Expected price"
+          : "Rental price";
+    [
+      validateAmount(listingPrice, priceLabel),
+      dealType === "sale"
+        ? validateAmount(purchasePrice, "Purchase price")
+        : null,
+      validatePercent(expectedCommission, "Expected commission"),
+      coAgents.length > 0 ? validatePercent(mySplitPct, "Your split") : null,
+      ...coAgents.map((a) => validatePercent(a.splitPct, "Agent split")),
+    ].forEach((msg) => {
+      if (msg && !newErrors.includes(msg)) newErrors.push(msg);
+    });
 
     if (newErrors.length > 0) {
       setErrors(newErrors);
@@ -515,7 +538,7 @@ function NewDeal() {
         <fieldset id="commission-other" className="flex flex-col gap-3">
           <legend className="font-medium">Commission and other</legend>
           <label className="flex flex-col md:flex-row gap-1 justify-between items-center">
-            Expected commission percent plus VAT
+            Expected commission (% excl. VAT)
             <input
               type="number"
               step="0.01"

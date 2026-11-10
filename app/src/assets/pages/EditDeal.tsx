@@ -18,7 +18,12 @@ import {
   type DealAgent,
   type AgentDirectoryEntry,
 } from "../../lib/dealAgents";
-import { isValidEmail, isValidPhone } from "../../lib/validators";
+import {
+  isValidEmail,
+  isValidPhone,
+  validateAmount,
+  validatePercent,
+} from "../../lib/validators";
 import { useAuth } from "../../lib/AuthProvider";
 import AttorneyPicker from "../components/AttorneyPicker";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -231,11 +236,22 @@ function EditDeal() {
     if (!propertyAddress.trim())
       newErrors.push("Property address is required.");
 
-    if (parseFloat(listingPrice) < 0)
-      newErrors.push("You listing price can't be a negative number");
-
-    if (parseFloat(purchasePrice) < 0)
-      newErrors.push("You purchase price can't be a negative number");
+    [
+      validateAmount(
+        listingPrice,
+        dealType === "sale" ? "Listing price" : "Monthly rent",
+      ),
+      dealType === "sale"
+        ? validateAmount(purchasePrice, "Purchase price")
+        : null,
+      validatePercent(expectedCommission, "Expected commission"),
+      validatePercent(
+        commissionSplitPct,
+        "Commission split with another agency",
+      ),
+    ].forEach((msg) => {
+      if (msg) newErrors.push(msg);
+    });
 
     if (newErrors.length > 0) {
       setDealErrors(newErrors);
@@ -727,11 +743,12 @@ function EditDeal() {
         <fieldset id="commission" className="flex flex-col gap-2">
           <legend className="font-medium">Commission</legend>
           <label className="flex flex-col sm:flex-row gap-1 justify-between items-center">
-            Expected commission
+            Expected commission (% excl. VAT)
             <input
               type="number"
               step="0.01"
               min="0"
+              max="100"
               value={expectedCommission}
               onChange={(e) => setExpectedCommission(e.target.value)}
             />

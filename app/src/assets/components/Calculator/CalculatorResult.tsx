@@ -7,6 +7,38 @@ type CalculatorResultProps = {
   calculatorData: CalculatorData;
 };
 
+// Display labels, keyed by the field names AgentCommission returns. Each label
+// says what the number actually is -- in particular, the Unity split is applied
+// to "Commission excl. VAT", NOT to "excl. VAT less royalty" (royalty is taken
+// off after the split). The formula itself lives in CommissionCalculator.js.
+function labelFor(key: string, d: CalculatorData): string {
+  switch (key) {
+    case "purchasePrice":
+      return "Purchase price";
+    case "commissionPercentage":
+      return "Your commission rate (incl. VAT)";
+    case "grossCommission":
+      return "Gross commission (incl. VAT)";
+    case "lessVAT":
+      return "Less VAT (15%)";
+    case "totalAfterVAT":
+      return "Commission excl. VAT (office split is applied to this)";
+    case "royalty":
+      return `Royalty (${d.royalty}% of commission excl. VAT)`;
+    case "totalAfterRoyalty":
+      return "Commission excl. VAT, less royalty (for reference only - not used in the split)";
+    case "totalAfterSplitWithUnity":
+      return `Your share after ${d.unitySplit}% office split and royalty`;
+    case "PAYE":
+    case "paye":
+      return `PAYE (${d.paye}% of your share)`;
+    case "nettPaymentToAgent":
+      return "Nett payment to you";
+    default:
+      return key.replace(/([A-Z])/g, " $1").toLowerCase();
+  }
+}
+
 /**
  * CalculatorResult Component
  * Displays the results of the calculator in a formatted list.
@@ -29,8 +61,8 @@ export default function CalculatorResult({
               key={key}
               className="flex justify-between border-b border-b-white w-full"
             >
-              <span className="font-semibold capitalize">
-                {key.replace(/([A-Z])/g, " $1").toLowerCase()}:
+              <span className="font-semibold">
+                {labelFor(key, calculatorData)}:
               </span>
               <span>{value || "-"}</span>
             </li>
