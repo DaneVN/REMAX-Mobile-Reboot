@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 
 function Login() {
@@ -151,6 +151,15 @@ function Login() {
               )}
             </button>
           </form>
+
+          <p className="text-center text-sm mt-4">
+            <Link
+              to="/forgot-password"
+              className="text-(--cl-accent-dark) underline"
+            >
+              Forgot password?
+            </Link>
+          </p>
 
           {/* Footer */}
           <p className="text-center text-(--cl-dark-blue)/60 text-sm mt-6">

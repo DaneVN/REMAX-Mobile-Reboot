@@ -1,6 +1,8 @@
 import { Route, Routes } from "react-router-dom";
 import Home from "./assets/pages/Home";
 import Login from "./assets/pages/Login";
+import ForgotPassword from "./assets/pages/ForgotPassword";
+import ResetPassword from "./assets/pages/ResetPassword";
 import Workflow from "./assets/pages/Workflow";
 import NewDeal from "./assets/pages/NewDeal";
 import EditDeal from "./assets/pages/EditDeal";
@@ -27,6 +29,8 @@ function App({ classN }: { classN: string }) {
       <Routes>
         {/* Public route — no session required */}
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Routes below require a logged-in session (any role) */}
         <Route element={<AuthRequired />}>
