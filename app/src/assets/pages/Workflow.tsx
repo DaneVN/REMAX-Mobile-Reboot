@@ -253,12 +253,29 @@ function Workflow() {
                       ? "bg-(--cl-accent-dark) text-(--cl-white)"
                       : "bg-(--cl-white) text-(--cl-dark-blue)") +
                     " p-2 mb-2 rounded shadow transition-shadow flex flex-col gap-1" +
-                    (canEdit ? " hover:shadow-lg cursor-pointer" : "") +
+                    (canEdit
+                      ? " hover:shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-(--cl-accent-dark)"
+                      : "") +
                     (taskIndex >= 3 && !expandedColumns[col]
                       ? " hidden md:flex"
                       : "")
                   }
                   onClick={canEdit ? () => setSelectedTask(task) : undefined}
+                  {...(canEdit
+                    ? {
+                        role: "button",
+                        tabIndex: 0,
+                        "aria-label": `Edit task: ${task.title}`,
+                        onKeyDown: (e: React.KeyboardEvent) => {
+                          // Only when the card itself is focused, not a child
+                          if (e.target !== e.currentTarget) return;
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelectedTask(task);
+                          }
+                        },
+                      }
+                    : {})}
                 >
                   <div>
                     <strong>{task.title}</strong>
