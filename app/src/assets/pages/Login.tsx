@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
+import CaptchaField, { type CaptchaHandle } from "../components/CaptchaField";
+import { captchaEnabled } from "../../lib/captcha";
 
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<CaptchaHandle>(null);
   const navigate = useNavigate();
 
   async function handleLogin(e: React.FormEvent) {
@@ -17,6 +21,8 @@ function Login() {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
       newErrors.push("Enter a valid email address.");
     if (!password) newErrors.push("Password is required.");
+    if (captchaEnabled && !captchaToken)
+      newErrors.push("Please complete the CAPTCHA.");
 
     if (newErrors.length > 0) {
       setErrors(newErrors);
@@ -29,9 +35,11 @@ function Login() {
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
+      options: { captchaToken: captchaToken ?? undefined },
     });
 
     setLoading(false);
+    captchaRef.current?.reset(); // tokens are single-use
 
     if (error) {
       setErrors([error.message]);
@@ -124,6 +132,8 @@ function Login() {
                 </button>
               </div>
             </div>
+
+            <CaptchaField ref={captchaRef} onToken={setCaptchaToken} />
 
             {/* Error block — all errors shown together just above the button */}
             {errors.length > 0 && (

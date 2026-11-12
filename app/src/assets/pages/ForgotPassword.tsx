@@ -1,13 +1,17 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 import { isValidEmail } from "../../lib/validators";
+import CaptchaField, { type CaptchaHandle } from "../components/CaptchaField";
+import { captchaEnabled } from "../../lib/captcha";
 
 function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<CaptchaHandle>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -15,12 +19,18 @@ function ForgotPassword() {
       setError("Enter a valid email address.");
       return;
     }
+    if (captchaEnabled && !captchaToken) {
+      setError("Please complete the CAPTCHA.");
+      return;
+    }
     setError(null);
     setLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: `${window.location.origin}/reset-password`,
+      captchaToken: captchaToken ?? undefined,
     });
     setLoading(false);
+    captchaRef.current?.reset(); // tokens are single-use
     if (error) {
       setError(error.message);
       return;
@@ -62,6 +72,7 @@ function ForgotPassword() {
               onChange={(e) => setEmail(e.target.value)}
               className="px-4 py-2 border border-(--cl-base) rounded-lg"
             />
+            <CaptchaField ref={captchaRef} onToken={setCaptchaToken} />
             {error && (
               <p role="alert" className="text-(--cl-accent-dark) text-sm">
                 {error}
