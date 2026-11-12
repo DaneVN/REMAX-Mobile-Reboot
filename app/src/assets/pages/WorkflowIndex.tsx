@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 import { archiveDeal } from "../../lib/deals";
 import { getBoardTitle } from "../../lib/boardTitle";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { useAuth } from "../../lib/AuthProvider";
 import { useUserRole } from "../../lib/useUserRole";
 import {
@@ -90,6 +91,7 @@ function WorkflowIndex() {
     loadError: string | null;
   } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [removingDeal, setRemovingDeal] = useState<DealSummary | null>(null);
 
   const loading = result?.status !== status;
   const deals = result?.status === status ? result.deals : [];
@@ -131,7 +133,9 @@ function WorkflowIndex() {
               status === "active" &&
               allTasks.some((t) => isTaskOverdue(t.due_date, t.column)),
             representing: (row.representing ?? "seller") as
-              "seller" | "buyer" | "both",
+              | "seller"
+              | "buyer"
+              | "both",
             firstBuyerName,
             agentNames: agentNamesLabel(row.deal_agents),
             isMine: isAssignedTo(row.deal_agents, userId),
@@ -277,7 +281,7 @@ function WorkflowIndex() {
                     Edit
                   </Link>
                   <button
-                    onClick={() => handleArchive(deal.id)}
+                    onClick={() => setRemovingDeal(deal)}
                     className={
                       //if the deal has overdue tasks, the button is white, otherwise it is red
                       deal.hasOverdueTask
@@ -293,6 +297,19 @@ function WorkflowIndex() {
           ))}
         </>
       )}
+      <ConfirmDialog
+        open={removingDeal !== null}
+        title="Remove this deal?"
+        message={`"${removingDeal?.firstBuyerName ?? removingDeal?.property_address}" will be moved to your archived deals. You can restore it from there.`}
+        confirmLabel="Remove"
+        destructive
+        onCancel={() => setRemovingDeal(null)}
+        onConfirm={() => {
+          const id = removingDeal?.id;
+          setRemovingDeal(null);
+          if (id) handleArchive(id);
+        }}
+      />
     </div>
   );
 }

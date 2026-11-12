@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import type { WorkflowTask } from "../../lib/workflow";
@@ -62,6 +62,15 @@ function TaskEditModal({
 
   // Delete confirmation state
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
+
+  // Move focus to the title when the modal opens, and hand it back to the
+  // element that opened it (the task card) when it closes.
+  const titleRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    titleRef.current?.focus();
+    return () => opener?.focus?.();
+  }, []);
 
   // Lock background scroll while the modal (or its confirmation) is open
   useEffect(() => {
@@ -238,6 +247,7 @@ function TaskEditModal({
             <label className="flex flex-col gap-1">
               <span className="text-sm font-medium">Title</span>
               <input
+                ref={titleRef}
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
